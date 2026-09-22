@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Share2, Download, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { auraFor, polyPoints } from "@/lib/aura";
@@ -221,6 +221,7 @@ export const RipplePoster = ({ chain, shareToken }) => {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="glass border-cyan-500/40 sm:max-w-sm" data-testid="ripple-poster-modal">
           <DialogTitle className="sr-only">Share poster</DialogTitle>
+          <DialogDescription className="sr-only">A shareable image of your chain with a QR code to join.</DialogDescription>
           <div className="flex flex-col items-center gap-4 py-1">
             {preview ? (
               <img src={preview} alt="Your chain poster" className="w-full max-w-[320px] rounded-2xl border border-cyan-500/30 neon-cyan" data-testid="poster-image" />
