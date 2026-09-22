@@ -43,13 +43,14 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[100] flex items-center justify-center px-5 overflow-hidden"
+          className="fixed inset-0 z-[100] flex items-center justify-center px-5 overflow-hidden bg-[#05070F]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           data-testid="join-reveal"
-          style={{ background: "radial-gradient(circle at 50% 40%, rgba(0,240,255,0.10), #05070F 70%)" }}
         >
+          {/* radial glow layer (opaque base above prevents page bleed-through) */}
+          <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 38%, rgba(0,240,255,0.14), transparent 62%)" }} />
           {/* shockwave */}
           <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2 h-40 w-40 rounded-full border-2 animate-shockwave" style={{ borderColor: aura.palette.primary }} />
 
@@ -88,7 +89,7 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={stage >= 3 ? { opacity: 1, y: 0 } : {}}
-              className="relative inline-flex items-center gap-2 rounded-full px-4 py-2 border text-sm font-semibold"
+              className={`relative inline-flex items-center gap-2 rounded-full px-4 py-2 border text-sm font-semibold ${city && city !== "Remote" ? "" : "hidden"}`}
               style={{ borderColor: aura.palette.secondary + "66", color: aura.palette.secondary, background: aura.palette.secondary + "14" }}
             >
               <span className="relative flex h-2.5 w-2.5">

@@ -24,20 +24,16 @@ A shareable, no-download human referral chain (mobile-first PWA). People start o
 - EN + Somali toggle
 
 ## Implemented (2026-06)
-- ✅ Full core loop: create → join (parent attribution via share token) → personal dashboard → share
-- ✅ Signed device cookie, verified/unverified split, per-IP rate limit, idempotent joins
-- ✅ Personal lineage view with milestones + progress
-- ✅ Global stats + animated canvas chain map (city clusters, glowing arcs, zoom)
-- ✅ Invite landing "/j/{share}" with "X sent this to you" + live preview
-- ✅ WhatsApp/SMS/native/copy/QR share panel
-- ✅ Report dialog; EN/SO bilingual toggle (persisted)
-- ✅ Flagship "Puntland" seeded chain (~40 members)
-- ✅ PWA manifest + dark theme
-- ✅ **Real-Time Pulse**: SSE stream (`/api/tartans/{token}/stream`) pushes live stats + join events; counters update instantly, incoming-join toasts (iteration 2)
-- ✅ **Milestone Moments**: confetti burst + downloadable/shareable canvas card on crossing 10/25/50/100/... (iteration 2)
-- ✅ **Organizer Dashboard**: initiator-only analytics at `/dashboard/{share}` — cumulative reach area chart, depth-distribution bars, geographic spread, top branches (iteration 2)
-- ✅ **Avatar Uploads**: optional profile photo via Emergent object storage; generated gradient icon fallback; owner-only update via device cookie (iteration 2)
-- ✅ Tested: 20/20 backend pytest, 100% frontend flows across both iterations
+- ✅ Core loop, device-cookie verified/unverified split, rate limits, idempotent joins
+- ✅ Personal lineage + milestones, global stats + canvas chain map, invite landing, share panel, report, EN/SO toggle, flagship Puntland seed, PWA shell
+- ✅ Real-Time Pulse (SSE), Milestone Moments (confetti + shareable card), Organizer Dashboard (charts), Avatar Uploads (object storage)
+- ✅ **WOW / "Living Synapse" redesign (iteration 3)**:
+  - Immersive generative living-chain canvas hero (SSE-fed bursts, FPS fallback) + Unbounded display type + "Ignite your spark"
+  - Cinematic Join Reveal (spark #N count-up, chain sigil, node-activated pill, share launchpad) on join AND create
+  - Deterministic chain Aura + SVG Sigil identity per chain (lib/aura.js, ChainSigil)
+  - Personal Ripple SVG viz + spreader Rank/percentile + spark number on dashboard
+  - Backend: member.spark_number + chain rank/total_in_chain/percentile
+- ✅ Tested: 24/24 backend pytest, 100% of frontend flows across 3 iterations
 
 ## Backlog (prioritized)
 - P1: Hide initiator_share_token from public list response

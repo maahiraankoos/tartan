@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 3 (WOW-FACTOR 'Living Synapse' redesign) tested end-to-end. Backend: 4/4 new pytest cases pass covering (a) chain endpoint returns rank/total_in_chain/percentile plus me.spark_number=1 for initiator, (b) POST /tartans/{token}/join response.member.spark_number is an int > 1 for new joiners and lineage attributes to inviter (Amina), (c) POST /tartans creates initiator with spark_number=1 / rank=1 / total_in_chain=1, (d) percentile bounded 1..100. Full regression suite still green: 24/24 total (test_tartan_api 13 + test_iteration2 7 + test_iteration3 4). Frontend (mobile 390x844): Home renders immersive LivingChainCanvas hero + ignite-spark-hero-cta + start-tartan-button + 22 unique chain-card SVG sigils. /j/j4atawQ7lw join flow: clicking join-chain-cta-button -> filling nickname-input -> confirm-join-button -> the JoinReveal overlay (data-testid join-reveal) appears with 'YOU JOINED THE CHAIN', big Spark #68, chain sigil, 'NODE ACTIVATED · <city>' pill, and share launchpad (reveal-whatsapp-button, reveal-copy-button, reveal-continue-button). Clicking reveal-continue-button navigates to /me/{new share} (verified ee5ZZM3mAc). MeDashboard shows spark-status with 'YOUR SPARK #68', spreader-rank '#25', 'Top 65% of 68', and PersonalRipple SVG viz (data-testid personal-ripple). Initiator /me/j4atawQ7lw shows rank '#1', 'Top 100% of 68', organizer-dashboard-link present, and personal-ripple renders. Create-a-Tartan flow: start-tartan-button opens dialog with live sigil SVG preview (inside data-testid start-tartan-modal) as title is typed; create-tartan-submit triggers the join-reveal overlay showing 'YOU LIT THE SPARK' + Spark #1, and reveal-continue-button navigates to /me/{share} of the new initiator.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "JoinReveal overlay (mobile 390px)", "issues": ["Visual stacking overlap: the big Spark #N number, the chain sigil, and the 3-stat card (verified/activated/cities) partially overlap at narrow widths — the NODE ACTIVATED pill also sits on top of the stats card. Reveal reads correctly but layout looks crowded/z-fighting on mobile.", "Confetti particles overlay slightly obscures the sigil during the staged animation (cosmetic)."]},
+      {"screen": "MilestoneCard / StartTartanDialog", "issues": ["Radix warning persists: 'Missing Description or aria-describedby for DialogContent' — non-blocking a11y warning inherited from iterations 1/2."]},
+      {"screen": "Join reveal city pill", "issues": ["When joining without a city selected, the pill shows 'NODE ACTIVATED · Remote'. Consider auto-detecting or hiding the pill instead of showing 'Remote' if that's a fallback."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3.py",
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/test_tartan_api.py",
+    "/app/test_reports/pytest/iteration3_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Tighten JoinReveal mobile layout so Spark#N, sigil, NODE-ACTIVATED pill and stats card do not overlap at 390px width.",
+    "(Optional) Suppress or replace 'NODE ACTIVATED · Remote' when the joiner has not provided a city (either hide pill or use inferred city).",
+    "(Optional, carried over) Add DialogTitle/Description or VisuallyHidden wrapper to StartTartanDialog / MilestoneCard for Radix a11y compliance."
+  ],
+  "critical_code_review_comments": [
+    "backfill_sparks() runs on every startup and scans all tartans; for large deployments consider a one-shot migration flag stored in a system collection instead of per-boot scan.",
+    "Rank computation in chain endpoint counts descendants ahead per-request via count_documents; at scale precompute rank/percentile on write (or cache in Redis) to avoid O(N) DB scans on hot dashboard route.",
+    "LivingChainCanvas triggers a Canvas2D getImageData warning ('willReadFrequently=true' hint). Minor perf tweak — set the flag to avoid GPU->CPU readback overhead on low-end mobile.",
+    "JoinReveal is time-staged with fixed setTimeouts (~0.3/1.3/2.1/2.9s) — a user who navigates away quickly may miss the share launchpad; consider allowing skip/tap-to-advance.",
+    "Deterministic aura/sigil seeding (hashSeed) uses chain token — collisions extremely unlikely but ensure user-created tokens are validated to avoid empty/very-short seeds producing dim palettes."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration3.py"],
+  "success_rate": {"backend": "100% (4/4 new + 20/20 regression = 24/24)", "frontend": "100% of tested wow-flows"},
+  "test_credentials": "No auth. Flagship tartan 'puntland'; initiator share 'j4atawQ7lw' (Amina).",
+  "seed_data_creation": "Backend created TEST_Spark, TEST_Pct puntland members and one TEST_Reveal Chain tartan (TEST_Creator initiator). Harmless for regression.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: pytest /app/backend/tests/ -v (all 24 pass). Frontend WOW flow: (1) Home -> ignite-spark-hero-cta / start-tartan-button / 22 sigil chain cards, (2) /j/j4atawQ7lw -> join-chain-cta-button -> nickname-input -> confirm-join-button -> wait ~3s -> join-reveal + reveal-whatsapp-button/reveal-copy-button/reveal-continue-button -> continue navigates /me/{share}, (3) /me/{share} shows spark-status / spreader-rank / personal-ripple, (4) start-tartan-button opens dialog with live sigil preview svg inside start-tartan-modal, submit -> 'YOU LIT THE SPARK' reveal with Spark #1. Backend join accepts field name 'parent_share_token' (NOT inviter_share_token). Create tartan payload uses title/goal/nickname/city (no explicit token in this iteration).",
+  "rca of the issue": "N/A — no functional bugs. Only cosmetic mobile-layout overlap in JoinReveal and a fallback 'Remote' city label when city is not supplied."
+}
