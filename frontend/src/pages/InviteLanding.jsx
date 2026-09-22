@@ -7,6 +7,8 @@ import { JoinModal } from "@/components/JoinModal";
 import { Avatar } from "@/components/Avatar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { useApp, saveMembership, getMembership } from "@/context/AppContext";
+import { useTartanStream } from "@/hooks/useTartanStream";
+import { mediaUrl } from "@/lib/helpers";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -18,6 +20,7 @@ export default function InviteLanding() {
   const [error, setError] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joining, setJoining] = useState(false);
+  const { stats: liveStats } = useTartanStream(ctx?.tartan?.token);
 
   useEffect(() => {
     api
@@ -69,6 +72,7 @@ export default function InviteLanding() {
   }
 
   const { inviter, tartan, stats } = ctx;
+  const s = liveStats || stats;
 
   return (
     <>
@@ -76,7 +80,7 @@ export default function InviteLanding() {
       <main className="max-w-md mx-auto px-4 py-8">
         <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-[#0E1526] via-[#070B14] to-[#12233b] p-6 text-center animate-float-up">
           <div className="flex flex-col items-center gap-3">
-            <Avatar name={inviter.nickname} size={68} ring testid="inviter-avatar" />
+            <Avatar name={inviter.nickname} src={mediaUrl(inviter.avatar_url)} size={68} ring testid="inviter-avatar" />
             <p className="text-slate-300" data-testid="invite-headline">
               <span className="font-display font-bold text-cyan-300 text-glow-cyan text-lg">{inviter.nickname}</span>
               <br />
@@ -92,17 +96,17 @@ export default function InviteLanding() {
           <div className="grid grid-cols-3 gap-2 mt-4">
             <div className="rounded-xl bg-black/30 border border-slate-800 py-3">
               <Users size={15} className="mx-auto text-cyan-400 mb-1" />
-              <div className="font-mono font-bold text-cyan-300"><AnimatedNumber value={stats.verified_members} /></div>
+              <div className="font-mono font-bold text-cyan-300"><AnimatedNumber value={s.verified_members} /></div>
               <div className="text-[9px] uppercase tracking-wider text-slate-500">{t("live_reach")}</div>
             </div>
             <div className="rounded-xl bg-black/30 border border-slate-800 py-3">
               <TrendingUp size={15} className="mx-auto text-emerald-400 mb-1" />
-              <div className="font-mono font-bold text-emerald-300"><AnimatedNumber value={stats.velocity_1h} /></div>
+              <div className="font-mono font-bold text-emerald-300"><AnimatedNumber value={s.velocity_1h} /></div>
               <div className="text-[9px] uppercase tracking-wider text-slate-500">{t("velocity")}</div>
             </div>
             <div className="rounded-xl bg-black/30 border border-slate-800 py-3">
               <MapPin size={15} className="mx-auto text-amber-400 mb-1" />
-              <div className="font-mono font-bold text-amber-300"><AnimatedNumber value={stats.active_cities} /></div>
+              <div className="font-mono font-bold text-amber-300"><AnimatedNumber value={s.active_cities} /></div>
               <div className="text-[9px] uppercase tracking-wider text-slate-500">{t("active_cities")}</div>
             </div>
           </div>
@@ -135,6 +139,7 @@ export default function InviteLanding() {
         onJoin={doJoin}
         loading={joining}
         inviterName={inviter.nickname}
+        inviterAvatar={mediaUrl(inviter.avatar_url)}
       />
     </>
   );

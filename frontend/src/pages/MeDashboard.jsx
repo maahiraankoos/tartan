@@ -1,20 +1,27 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Loader2, Trophy, ArrowRight, PartyPopper } from "lucide-react";
+import { Loader2, Trophy, ArrowRight, PartyPopper, Camera, BarChart3, Crown } from "lucide-react";
 import { Header } from "@/components/Header";
 import { SharePanel } from "@/components/SharePanel";
 import { LineageView } from "@/components/LineageView";
 import { ReportDialog } from "@/components/ReportDialog";
+import { MilestoneCard } from "@/components/MilestoneCard";
+import { Avatar } from "@/components/Avatar";
 import { Progress } from "@/components/ui/progress";
 import { useApp } from "@/context/AppContext";
-import { fmtNum } from "@/lib/helpers";
+import { useTartanStream } from "@/hooks/useTartanStream";
+import { fmtNum, mediaUrl } from "@/lib/helpers";
 import api from "@/lib/api";
+import { toast } from "sonner";
 
 export default function MeDashboard() {
   const { shareToken } = useParams();
   const { t } = useApp();
   const [chain, setChain] = useState(null);
   const [error, setError] = useState(false);
+  const [msOpen, setMsOpen] = useState(false);
+  const [celebrateMs, setCelebrateMs] = useState(null);
+  const fileRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -27,9 +34,47 @@ export default function MeDashboard() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(load, 6000);
-    return () => clearInterval(iv);
   }, [load]);
+
+  // live: re-fetch on any join in this tartan
+  useTartanStream(chain?.tartan?.token, { onJoin: () => load() });
+
+  // milestone detection
+  useEffect(() => {
+    if (!chain) return;
+    const reached = chain.milestones_reached || [];
+    if (!reached.length) return;
+    const top = reached[reached.length - 1];
+    const key = `tartan_ms_${shareToken}`;
+    const raw = localStorage.getItem(key);
+    if (raw === null) {
+      localStorage.setItem(key, String(top));
+      return;
+    }
+    if (top > parseInt(raw, 10)) {
+      localStorage.setItem(key, String(top));
+      setCelebrateMs(top);
+      setMsOpen(true);
+    }
+  }, [chain, shareToken]);
+
+  const changeAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image too large (max 5MB)");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      await api.post(`/members/${shareToken}/avatar`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success("Photo updated");
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not update photo");
+    }
+  };
 
   if (error) {
     return (
@@ -74,6 +119,33 @@ export default function MeDashboard() {
           </Link>
         )}
 
+        {/* Profile row */}
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-700/60 bg-[#0E1526] p-4 mb-5" data-testid="profile-row">
+          <button onClick={() => fileRef.current?.click()} className="relative shrink-0" data-testid="change-avatar-button">
+            <Avatar name={me.nickname} src={mediaUrl(me.avatar_url)} size={52} ring />
+            <span className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-cyan-500 flex items-center justify-center border-2 border-[#0E1526]">
+              <Camera size={12} className="text-slate-950" />
+            </span>
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" onChange={changeAvatar} className="hidden" data-testid="avatar-change-input" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="font-display font-bold text-white truncate">{me.nickname}</span>
+              {me.is_initiator && <Crown size={14} className="text-amber-400" />}
+            </div>
+            <div className="text-xs text-slate-400">{me.city} · {me.verified ? t("verified") : "unverified"}</div>
+          </div>
+          {me.is_initiator && (
+            <Link
+              to={`/dashboard/${shareToken}`}
+              data-testid="organizer-dashboard-link"
+              className="flex items-center gap-1.5 text-xs font-semibold text-amber-300 border border-amber-500/40 rounded-full px-3 py-2 hover:bg-amber-500/10"
+            >
+              <BarChart3 size={14} /> {t("view_dashboard")}
+            </Link>
+          )}
+        </div>
+
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 mb-5 flex items-center gap-3" data-testid="welcome-banner">
           <PartyPopper size={20} className="text-emerald-400 shrink-0" />
           <p className="text-sm text-slate-300">{t("return_hint")}</p>
@@ -104,9 +176,14 @@ export default function MeDashboard() {
           {milestones_reached?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {milestones_reached.map((m) => (
-                <span key={m} className="text-[10px] font-mono text-emerald-300 border border-emerald-500/30 rounded-full px-2 py-0.5">
+                <button
+                  key={m}
+                  onClick={() => { setCelebrateMs(m); setMsOpen(true); }}
+                  data-testid={`milestone-badge-${m}`}
+                  className="text-[10px] font-mono text-emerald-300 border border-emerald-500/30 rounded-full px-2 py-0.5 hover:bg-emerald-500/10"
+                >
                   ✓ {fmtNum(m)}
-                </span>
+                </button>
               ))}
             </div>
           )}
@@ -122,6 +199,14 @@ export default function MeDashboard() {
           {tartan && <ReportDialog tartanToken={tartan.token} />}
         </div>
       </main>
+
+      <MilestoneCard
+        open={msOpen}
+        onOpenChange={setMsOpen}
+        milestone={celebrateMs}
+        tartanTitle={tartan?.title}
+        nickname={me.nickname}
+      />
     </>
   );
 }

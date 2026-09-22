@@ -28,8 +28,7 @@ export function avatarFor(name) {
   return { grad, initials };
 }
 
-export function timeAgo(iso) {
-  if (!iso) return "";
+export function timeAgo(iso) {  if (!iso) return "";
   const d = new Date(iso);
   const s = Math.max(1, Math.floor((Date.now() - d.getTime()) / 1000));
   if (s < 60) return `${s}s`;
@@ -39,4 +38,10 @@ export function timeAgo(iso) {
   if (h < 24) return `${h}h`;
   const days = Math.floor(h / 24);
   return `${days}d`;
+}
+
+export function mediaUrl(path) {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  return `${process.env.REACT_APP_BACKEND_URL}${path}`;
 }

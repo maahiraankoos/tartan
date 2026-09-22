@@ -6,6 +6,7 @@ import Home from "@/pages/Home";
 import TartanView from "@/pages/TartanView";
 import InviteLanding from "@/pages/InviteLanding";
 import MeDashboard from "@/pages/MeDashboard";
+import OrganizerDashboard from "@/pages/OrganizerDashboard";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
             <Route path="/t/:token" element={<TartanView />} />
             <Route path="/j/:shareToken" element={<InviteLanding />} />
             <Route path="/me/:shareToken" element={<MeDashboard />} />
+            <Route path="/dashboard/:shareToken" element={<OrganizerDashboard />} />
           </Routes>
         </BrowserRouter>
         <Toaster position="top-center" theme="dark" richColors />

@@ -1,7 +1,7 @@
 import React from "react";
 import { Avatar } from "@/components/Avatar";
 import { useApp } from "@/context/AppContext";
-import { timeAgo, fmtNum } from "@/lib/helpers";
+import { timeAgo, fmtNum, mediaUrl } from "@/lib/helpers";
 import { ArrowDown, Crown } from "lucide-react";
 
 const NodeCard = ({ member, label, highlight, testid }) => {
@@ -15,7 +15,7 @@ const NodeCard = ({ member, label, highlight, testid }) => {
           : "border-slate-700/60 bg-[#0E1526]"
       }`}
     >
-      <Avatar name={member.nickname} size={44} ring={highlight} />
+      <Avatar name={member.nickname} src={mediaUrl(member.avatar_url)} size={44} ring={highlight} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className={`font-display font-bold truncate ${highlight ? "text-cyan-300 text-glow-cyan" : "text-white"}`}>
@@ -88,7 +88,7 @@ export const LineageView = ({ chain }) => {
             <div className="flex flex-wrap justify-center gap-3">
               {directs.map((d) => (
                 <div key={d.share_token} className="flex flex-col items-center gap-1 w-16 animate-float-up" data-testid={`lineage-direct-${d.share_token}`}>
-                  <Avatar name={d.nickname} size={38} />
+                  <Avatar name={d.nickname} src={mediaUrl(d.avatar_url)} size={38} />
                   <span className="text-[10px] text-slate-300 truncate w-full text-center">{d.nickname}</span>
                   {d.downstream_count > 0 && (
                     <span className="text-[9px] text-emerald-400">+{fmtNum(d.downstream_count)}</span>

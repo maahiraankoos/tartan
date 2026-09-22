@@ -65,6 +65,23 @@ export const DICT = {
   verified: { EN: "verified", SO: "la xaqiijiyay" },
   the_map: { EN: "Chain map", SO: "Khariidadda silsiladda" },
   view_my_branch: { EN: "View my branch", SO: "Fiiri laantayda" },
+  add_photo: { EN: "Add a photo", SO: "Ku dar sawir" },
+  change_photo: { EN: "Change photo", SO: "Bedel sawirka" },
+  photo_optional: { EN: "Optional · stays with your nickname", SO: "Ikhtiyaari · wuxuu la socdaa naanaystaada" },
+  milestone_reached: { EN: "Milestone reached!", SO: "Xad ayaa la gaadhay!" },
+  milestone_sub: { EN: "people are now in your branch", SO: "qof ayaa hadda ku jira laantaada" },
+  share_milestone: { EN: "Share this moment", SO: "Wadaag daqiiqadan" },
+  download_card: { EN: "Download", SO: "Soo deji" },
+  close: { EN: "Close", SO: "Xir" },
+  organizer_dashboard: { EN: "Organizer Dashboard", SO: "Dashboorka Abaabulaha" },
+  view_dashboard: { EN: "View analytics", SO: "Fiiri tirakoobka" },
+  reach_over_time: { EN: "Reach over time", SO: "Gaadhista muddada" },
+  cumulative_reach: { EN: "Cumulative reach", SO: "Wadarta gaadhista" },
+  depth_dist: { EN: "Chain depth spread", SO: "Faafitaanka qoto-dheer" },
+  geo_spread: { EN: "Geographic spread", SO: "Faafitaanka juqraafi" },
+  top_branches: { EN: "Top branches", SO: "Laamaha ugu sarreeya" },
+  momentum: { EN: "Momentum (last hour)", SO: "Dhaqdhaqaaq (saacadii u dambeysay)" },
+  not_authorized: { EN: "Only the initiator can view this dashboard.", SO: "Kaliya bilaabaha ayaa arki kara dashboorkan." },
 };
 
 export function translate(lang, key) {

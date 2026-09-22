@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Header, Query
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -8,6 +9,10 @@ import hashlib
 import secrets
 import logging
 import time
+import json
+import uuid
+import asyncio
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Annotated, Any
@@ -23,6 +28,65 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 SECRET = os.environ.get('TARTAN_SECRET', 'dev_secret').encode()
+
+# ---- Object storage (Emergent) ----
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "tartan"
+storage_key = None
+MIME_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp"}
+
+
+def init_storage(force: bool = False):
+    global storage_key
+    if storage_key and not force:
+        return storage_key
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    storage_key = resp.json()["storage_key"]
+    return storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120,
+    )
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data, timeout=120,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str):
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+
+# ---- Real-time SSE pub/sub (in-process) ----
+_subscribers: dict = defaultdict(set)
+
+
+async def publish(token: str, event: dict):
+    for q in list(_subscribers.get(token, [])):
+        try:
+            q.put_nowait(event)
+        except Exception:
+            pass
+
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -107,6 +171,7 @@ class JoinCreate(BaseModel):
     real_name: Optional[str] = None
     parent_share_token: Optional[str] = None
     idempotency_key: Optional[str] = None
+    avatar_file_id: Optional[str] = None
 
 
 class ReportCreate(BaseModel):
@@ -133,6 +198,7 @@ def member_public(m: dict) -> dict:
         "downstream_count": m.get("downstream_count", 0),
         "created_at": m.get("created_at"),
         "is_initiator": m.get("is_initiator", False),
+        "avatar_url": f"/api/avatar/{m['share_token']}" if m.get("avatar_path") else None,
     }
 
 
@@ -335,6 +401,13 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
     while await db.members.find_one({"share_token": share}):
         share = make_token(8)
 
+    # resolve optional avatar
+    avatar_path = None
+    if payload.avatar_file_id:
+        f = await db.files.find_one({"id": payload.avatar_file_id, "device": device})
+        if f:
+            avatar_path = f["storage_path"]
+
     ts = now_iso()
     depth = parent.get("depth", 0) + 1
     member = {
@@ -353,6 +426,8 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
         "depth": depth,
         "direct_count": 0,
         "downstream_count": 0,
+        "verified_downstream": 0,
+        "avatar_path": avatar_path,
         "created_at": ts,
     }
     await db.members.insert_one(dict(member))
@@ -376,6 +451,14 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
         {"$inc": {"total_members": 1, "verified_members": inc_verified},
          "$max": {"max_depth": depth}},
     )
+
+    # real-time fan-out
+    t2 = await db.tartans.find_one({"token": token}, {"_id": 0})
+    if t2:
+        await publish(token, {"type": "stats", "data": await compute_stats(t2)})
+    await publish(token, {"type": "join", "data": {
+        "nickname": member["nickname"], "city": member["city"], "verified": verified,
+    }})
 
     return {"member": member_public(member)}
 
@@ -408,6 +491,158 @@ async def get_chain(share_token: str):
         "tartan": tartan_public(t) if t else None,
         "milestones_reached": reached,
         "next_milestone": next_milestone,
+    }
+
+
+@api_router.post("/avatars")
+async def upload_avatar(request: Request, response: Response, file: UploadFile = File(...)):
+    device = get_or_issue_device(request, response)
+    ext = (file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "png")
+    if ext not in MIME_TYPES:
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large (max 5MB)")
+    path = f"{APP_NAME}/avatars/{device}/{uuid.uuid4()}.{ext}"
+    try:
+        result = put_object(path, data, MIME_TYPES[ext])
+    except Exception as e:
+        logger.error("avatar upload failed: %s", e)
+        raise HTTPException(status_code=502, detail="Upload failed, please try again")
+    fid = uuid.uuid4().hex
+    await db.files.insert_one({
+        "id": fid, "storage_path": result["path"], "content_type": MIME_TYPES[ext],
+        "device": device, "created_at": now_iso(),
+    })
+    return {"avatar_file_id": fid}
+
+
+@api_router.post("/members/{share_token}/avatar")
+async def set_member_avatar(share_token: str, request: Request, response: Response, file: UploadFile = File(...)):
+    device = get_or_issue_device(request, response)
+    m = await db.members.find_one({"share_token": share_token})
+    if not m:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if m.get("device") != device:
+        raise HTTPException(status_code=403, detail="Not your membership")
+    ext = (file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "png")
+    if ext not in MIME_TYPES:
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large (max 5MB)")
+    path = f"{APP_NAME}/avatars/{device}/{uuid.uuid4()}.{ext}"
+    try:
+        result = put_object(path, data, MIME_TYPES[ext])
+    except Exception as e:
+        logger.error("avatar upload failed: %s", e)
+        raise HTTPException(status_code=502, detail="Upload failed, please try again")
+    await db.members.update_one({"share_token": share_token}, {"$set": {"avatar_path": result["path"]}})
+    return {"ok": True, "avatar_url": f"/api/avatar/{share_token}"}
+
+
+@api_router.get("/avatar/{share_token}")
+async def get_avatar(share_token: str):
+    m = await db.members.find_one({"share_token": share_token}, {"avatar_path": 1})
+    if not m or not m.get("avatar_path"):
+        raise HTTPException(status_code=404, detail="No avatar")
+    try:
+        content, ctype = get_object(m["avatar_path"])
+    except Exception:
+        raise HTTPException(status_code=404, detail="No avatar")
+    return Response(content=content, media_type=ctype, headers={"Cache-Control": "public, max-age=3600"})
+
+
+@api_router.get("/tartans/{token}/stream")
+async def stream(token: str, request: Request):
+    q: asyncio.Queue = asyncio.Queue()
+    _subscribers[token].add(q)
+
+    async def gen():
+        try:
+            t = await db.tartans.find_one({"token": token}, {"_id": 0})
+            if t:
+                yield f"event: stats\ndata: {json.dumps(await compute_stats(t))}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    ev = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"event: {ev['type']}\ndata: {json.dumps(ev['data'])}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            _subscribers[token].discard(q)
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no",
+    })
+
+
+@api_router.get("/tartans/{token}/analytics")
+async def analytics(token: str, owner: str = Query(...)):
+    t = await db.tartans.find_one({"token": token}, {"_id": 0})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    initiator = await db.members.find_one({"tartan_id": token, "share_token": owner})
+    if not initiator or not initiator.get("is_initiator"):
+        raise HTTPException(status_code=403, detail="Only the initiator can view analytics")
+
+    members = await db.members.find({"tartan_id": token}, {"_id": 0}).to_list(100000)
+
+    # reach timeline (last 14 days, by day)
+    day_counts: dict = defaultdict(lambda: {"joins": 0, "verified": 0})
+    for m in members:
+        ca = m.get("created_at")
+        if not ca:
+            continue
+        day = ca[:10]
+        day_counts[day]["joins"] += 1
+        if m.get("verified"):
+            day_counts[day]["verified"] += 1
+    today = datetime.now(timezone.utc).date()
+    timeline = []
+    cumulative = 0
+    days_sorted = sorted(day_counts.keys())
+    for d in days_sorted:
+        cumulative += day_counts[d]["joins"]
+        timeline.append({"date": d, "joins": day_counts[d]["joins"],
+                         "verified": day_counts[d]["verified"], "cumulative": cumulative})
+
+    # depth distribution
+    depth_map: dict = defaultdict(int)
+    for m in members:
+        depth_map[m.get("depth", 0)] += 1
+    depth_distribution = [{"depth": k, "count": depth_map[k]} for k in sorted(depth_map.keys())]
+
+    # geography
+    geo_map: dict = defaultdict(lambda: {"count": 0, "verified": 0})
+    for m in members:
+        c = m.get("city") or "Remote"
+        geo_map[c]["count"] += 1
+        if m.get("verified"):
+            geo_map[c]["verified"] += 1
+    geography = sorted(
+        [{"city": k, "count": v["count"], "verified": v["verified"]} for k, v in geo_map.items()],
+        key=lambda x: -x["count"],
+    )
+
+    # top branches = direct children of initiator, by downstream reach
+    branches = [m for m in members if m.get("parent_id") == initiator["id"]]
+    branches.sort(key=lambda x: -(x.get("downstream_count", 0)))
+    top_branches = [{
+        "nickname": b["nickname"], "city": b.get("city") or "Remote",
+        "share_token": b["share_token"], "direct_count": b.get("direct_count", 0),
+        "downstream_count": b.get("downstream_count", 0),
+    } for b in branches[:8]]
+
+    return {
+        "tartan": tartan_public(t),
+        "stats": await compute_stats(t),
+        "timeline": timeline,
+        "depth_distribution": depth_distribution,
+        "geography": geography,
+        "top_branches": top_branches,
     }
 
 
@@ -519,6 +754,11 @@ async def on_startup():
     await db.members.create_index([("tartan_id", 1), ("device", 1)])
     await db.members.create_index("parent_share_token")
     await db.tartans.create_index("token")
+    try:
+        init_storage()
+        logger.info("Storage initialized")
+    except Exception as e:
+        logger.error("storage init failed: %s", e)
     try:
         await seed_flagship()
     except Exception as e:

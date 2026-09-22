@@ -8,6 +8,7 @@ import { JoinModal } from "@/components/JoinModal";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Avatar } from "@/components/Avatar";
 import { useApp, saveMembership, getMembership } from "@/context/AppContext";
+import { useTartanStream } from "@/hooks/useTartanStream";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -20,6 +21,10 @@ export default function TartanView() {
   const [joining, setJoining] = useState(false);
   const myShare = getMembership(token);
 
+  const { stats: liveStats } = useTartanStream(token, {
+    onJoin: (j) => toast(`${j.nickname} · ${j.city}`, { icon: "⚡", description: "just joined the chain" }),
+  });
+
   const load = useCallback(async () => {
     try {
       const { data } = await api.get(`/tartans/${token}`);
@@ -31,9 +36,9 @@ export default function TartanView() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(load, 6000);
-    return () => clearInterval(iv);
   }, [load]);
+
+  const stats = liveStats || payload?.stats;
 
   const doJoin = async (form) => {
     setJoining(true);
@@ -76,7 +81,7 @@ export default function TartanView() {
                 <div className="flex items-center gap-3 mt-3 text-xs text-slate-400">
                   <span className="flex items-center gap-1"><Crown size={12} className="text-amber-400" /> {tartan.initiator_nickname}</span>
                   {tartan.city && <span>· {tartan.city}</span>}
-                  <span className="flex items-center gap-1"><Users size={12} className="text-cyan-400" /> {tartan.verified_members} {t("verified")}</span>
+                  <span className="flex items-center gap-1"><Users size={12} className="text-cyan-400" /> {stats?.verified_members ?? tartan.verified_members} {t("verified")}</span>
                 </div>
               </div>
             </div>
@@ -105,7 +110,7 @@ export default function TartanView() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-4">
-            <GlobalStats stats={payload?.stats} />
+            <GlobalStats stats={stats} />
           </div>
           <div className="lg:col-span-8">
             <ChainMap token={token} />
