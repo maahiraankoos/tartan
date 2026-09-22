@@ -1,0 +1,191 @@
+{
+  "project_name": "Tartan",
+  "app_type": "mobile_first_pwa",
+  "archetype": "Electric & Neon Tactical Viral Chain (Cyber-Puntland)",
+  "theme": {
+    "default_mode": "dark",
+    "background": "#070B14",
+    "surface": "#0E1526",
+    "surface_elevated": "#162036",
+    "border": "#1E2D4A",
+    "border_glow": "rgba(0, 240, 255, 0.35)",
+    "primary_cyan": "#00F0FF",
+    "primary_lime": "#00FF66",
+    "accent_amber": "#FFB800",
+    "destructive_rose": "#FF2A55",
+    "text_primary": "#F0F6FF",
+    "text_secondary": "#94A3B8",
+    "text_muted": "#64748B"
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "hierarchy": {
+      "hero_title": "text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight",
+      "section_heading": "text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight",
+      "card_heading": "text-lg sm:text-xl font-semibold",
+      "body": "text-sm sm:text-base font-normal leading-relaxed",
+      "caption": "text-xs font-medium tracking-wider uppercase text-slate-400",
+      "counter_display": "font-mono text-2xl sm:text-3xl font-bold tracking-wider text-cyan-400"
+    }
+  },
+  "layout_and_spacing": {
+    "mobile_container": "max-w-md mx-auto px-4 py-6 sm:px-6",
+    "desktop_container": "max-w-6xl mx-auto px-4 py-8 sm:px-8",
+    "grid_bento": "grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6",
+    "card_padding": "p-5 sm:p-6",
+    "hero_overlay_opacity": "bg-black/40 backdrop-blur-md"
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-[#0E1526]/80 border border-cyan-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+    "neon_glow_cyan": "shadow-[0_0_20px_rgba(0,240,255,0.3)] border-cyan-400/50",
+    "neon_glow_lime": "shadow-[0_0_20px_rgba(0,255,102,0.3)] border-emerald-400/50",
+    "s_curve_lineage": "svg curve connector with stroke-dasharray animation and cyan-to-lime gradient stroke",
+    "pulser_node": "relative flex h-3 w-3 children with animate-ping bg-cyan-400 rounded-full",
+    "scanline_effect": "bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]"
+  },
+  "bilingual_support": {
+    "default_language": "EN",
+    "supported_languages": ["EN", "SO"],
+    "language_names": {
+      "EN": "English",
+      "SO": "Soomaali"
+    },
+    "toggle_component": "Fixed header top-right button with quick EN / SO pill state transition",
+    "translations_dictionary": {
+      "tagline": {
+        "EN": "The Living Human Referral Chain",
+        "SO": "Aqoonta iyo Xiriirka Dadweynaha ee Nool"
+      },
+      "join_cta": {
+        "EN": "Join & Keep It Moving",
+        "SO": "Kusoobiir & Sii Wad Xiriirka"
+      },
+      "trust_badge_speed": {
+        "EN": "~5 seconds • No Account • No Email Required",
+        "SO": "~5 ilbiriqsi • Koonto La'aan • Iimayl Looma Baahna"
+      },
+      "start_tartan": {
+        "EN": "Start a New Tartan",
+        "SO": "Biloow Tartan Mp Cusub"
+      },
+      "invited_by": {
+        "EN": "Invited by",
+        "SO": "Waxaa kugu casuumay"
+      },
+      "direct_joins": {
+        "EN": "Your Direct Joins",
+        "SO": "Xiriiradaada Tooska ah"
+      },
+      "downstream_count": {
+        "EN": "Total Downstream Chain",
+        "SO": "Wadarta Silsilada Hoose"
+      },
+      "live_reach": {
+        "EN": "Verified Global Reach",
+        "SO": "Gaaritaanka Caalamiga ah"
+      },
+      "active_cities": {
+        "EN": "Active Cities",
+        "SO": "Magaalooyinka Firfircoon"
+      },
+      "share_whatsapp": {
+        "EN": "Share to WhatsApp",
+        "SO": "La wadaag WhatsApp"
+      },
+      "share_sms": {
+        "EN": "Share via SMS",
+        "SO": "La wadaag SMS"
+      },
+      "copy_link": {
+        "EN": "Copy Share Link",
+        "SO": "Nuuxi Linkiga"
+      },
+      "flagship_title": {
+        "EN": "Puntland Tech & Innovation Chain",
+        "SO": "Silsiladda Tiknoolajiyada Puntland"
+      }
+    }
+  },
+  "component_design_guidelines": {
+    "header_nav": {
+      "style": "sticky top-0 z-50 backdrop-blur-xl bg-[#070B14]/85 border-b border-slate-800/80 px-4 py-3 flex items-center justify-between",
+      "brand_badge": "Glowing cyan dot + bold logo 'Tartan'",
+      "features": ["Language Toggle EN/SO", "PWA Install Prompt button", "Live global node status pill"]
+    },
+    "hero_landing_view": {
+      "style": "relative rounded-2xl p-6 mb-6 overflow-hidden border border-cyan-500/30 bg-gradient-to-br from-[#0E1526] via-[#070B14] to-[#121E36]",
+      "components": [
+        "Dynamic banner: 'X sent this to you' with inviter avatar & nickname",
+        "Animated preview of the living referral lineage tree",
+        "Big Primary Action CTA: 'Join & Keep It Moving' with neon lime pulse",
+        "Trust Badges horizontal strip (~5s / No login / Low bandwidth PWA)"
+      ]
+    },
+    "quick_join_modal": {
+      "style": "Shadcn Dialog customized with dark slate glass background, neon cyan borders",
+      "inputs": ["Nickname input (max 18 chars, auto avatar generation)", "Optional City selection (e.g., Garowe, Bosaso, Galkayo, Mogadishu, Remote)"],
+      "action_button": "Pill-shaped bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-bold hover:shadow-[0_0_25px_rgba(0,240,255,0.6)] transition-all"
+    },
+    "personal_share_panel": {
+      "style": "p-5 rounded-xl border border-slate-700/60 bg-[#0E1526] space-y-4",
+      "elements": [
+        "Unique personal referral link with copy button",
+        "Interactive SVG QR code with download / full-screen toggle",
+        "Instant share buttons: WhatsApp (bg-emerald-600), SMS (bg-blue-600), Native Share API (bg-cyan-600), QR modal trigger"
+      ]
+    },
+    "lineage_view": {
+      "style": "relative py-6 px-4 bg-[#0B101D] rounded-2xl border border-slate-800 overflow-x-auto",
+      "structure": "Horizontal or Vertical node flow: Inviter Node -> YOU (Highlighted Neon Node) -> Direct Joins Grid -> Downstream branches",
+      "node_style": "Avatar circle + Nickname badge + City label + Time depth tag + S-Curve connecting line with glowing gradient"
+    },
+    "global_stats_and_map": {
+      "style": "grid grid-cols-1 lg:grid-cols-12 gap-6 my-8",
+      "stats_cards": "col-span-12 lg:col-span-4 grid grid-cols-2 gap-3 md:gap-4",
+      "map_container": "col-span-12 lg:col-span-8 relative h-[380px] sm:h-[450px] rounded-2xl overflow-hidden border border-cyan-500/30 bg-[#050810]",
+      "map_features": "Clustered neon city markers, zoom in/out controls, animated wave arcs between Puntland/Somalia cities and global destinations, live updates log"
+    },
+    "moderation_and_report": {
+      "style": "p-4 rounded-xl border border-slate-800 bg-[#0A0E1A] mt-8 flex flex-wrap justify-between items-center text-xs text-slate-400",
+      "actions": ["Report inappropriate chain / initiator button", "Block chain node option", "Initiator moderation panel badge"]
+    }
+  },
+  "image_urls": {
+    "network_map_backdrop": "https://images.unsplash.com/photo-1638356554489-decb2e3a4c37?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHw0fHxmdXR1cmlzdGljJTIwZGFyayUyMGdsb3dpbmclMjBuZXR3b3JrJTIwbWFwJTIwbm9kZXN8ZW58MHx8fHwxNzkwMTE2ODU3fDA&ixlib=rb-4.1.0&q=85",
+    "puntland_flagship_bg": "https://images.pexels.com/photos/29248948/pexels-photo-29248948.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "avatar_inviter_1": "https://images.unsplash.com/photo-1633195793356-d9041e6f7356?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHw0fHxkaXZlcnNlJTIwYXZhdGFyJTIwcG9ydHJhaXRzJTIwbmVvbiUyMGRhcmt8ZW58MHx8fHwxNzkwMTE2ODU3fDA&ixlib=rb-4.1.0&q=85",
+    "avatar_inviter_2": "https://images.unsplash.com/photo-1762274674115-a511e3d3c688?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwzfHxkaXZlcnNlJTIwYXZhdGFyJTIwcG9ydHJhaXRzJTIwbmVvbiUyMGRhcmt8ZW58MHx8fHwxNzkwMTE2ODU3fDA&ixlib=rb-4.1.0&q=85",
+    "avatar_user_3": "https://images.unsplash.com/photo-1644353224392-7e532d7b8f4b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwxfHxkaXZlcnNlJTIwYXZhdGFyJTIwcG9ydHJhaXRzJTIwbmVvbiUyMGRhcmt8ZW58MHx8fHwxNzkwMTE2ODU3fDA&ixlib=rb-4.1.0&q=85",
+    "avatar_cyber_woman": "https://images.pexels.com/photos/8107821/pexels-photo-8107821.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+  },
+  "testing_and_accessibility": {
+    "data_testid_rules": "All interactive elements, buttons, input fields, language switchers, map controls, copy link actions MUST have data-testid in kebab-case format.",
+    "sample_data_testids": [
+      "data-testid=\"language-toggle-button\"",
+      "data-testid=\"join-chain-cta-button\"",
+      "data-testid=\"nickname-input\"",
+      "data-testid=\"city-select\"",
+      "data-testid=\"confirm-join-button\"",
+      "data-testid=\"whatsapp-share-button\"",
+      "data-testid=\"sms-share-button\"",
+      "data-testid=\"copy-link-button\"",
+      "data-testid=\"qr-code-modal-trigger\"",
+      "data-testid=\"start-tartan-button\"",
+      "data-testid=\"map-zoom-in-button\"",
+      "data-testid=\"map-zoom-out-button\"",
+      "data-testid=\"report-chain-button\""
+    ],
+    "contrast_compliance": "All neon text on dark backgrounds must maintain at least 4.5:1 ratio. Interactive text states must explicitly specify hover:text-white or hover:text-cyan-300."
+  },
+  "instructions_to_main_agent": [
+    "1. Build Tartan as a mobile-first PWA experience with lightweight dark neon design optimized for low-bandwidth networks.",
+    "2. Ensure bilingual EN / Somali toggle is fully functional across all components and stateful.",
+    "3. Render the S-curve lineage graph dynamically showing the invite chain: 'Who invited you -> YOU -> Direct Joins -> Downstream Count'.",
+    "4. Implement an interactive clustered map visualizer with simulated or real-time glowing node arcs across cities like Garowe, Bosaso, Galkayo, Mogadishu, Hargeisa, London, Minneapolis, Dubai.",
+    "5. Make sure the share modal includes instant direct actions for WhatsApp, SMS, Native Web Share API, Copy Link, and SVG QR Code.",
+    "6. Do NOT use transparent backgrounds without backdrop-blur filters for headers, overlays, or popovers.",
+    "7. Include all specified data-testid attributes on key interactive components for verification."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "short_name": "Tartan",
+  "name": "Tartan — The Living Human Chain",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070B14",
+  "theme_color": "#070B14",
+  "orientation": "portrait",
+  "icons": []
+}

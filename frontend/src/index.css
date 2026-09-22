@@ -1,0 +1,119 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 218 55% 5%;
+  --foreground: 213 60% 96%;
+  --card: 220 42% 10%;
+  --card-foreground: 213 60% 96%;
+  --popover: 220 45% 8%;
+  --popover-foreground: 213 60% 96%;
+  --primary: 186 100% 50%;
+  --primary-foreground: 220 60% 6%;
+  --secondary: 220 35% 16%;
+  --secondary-foreground: 213 60% 96%;
+  --muted: 220 30% 15%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 145 100% 50%;
+  --accent-foreground: 220 60% 6%;
+  --destructive: 347 100% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 218 40% 20%;
+  --input: 218 40% 18%;
+  --ring: 186 100% 50%;
+  --radius: 0.9rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body {
+  margin: 0;
+  background: #070b14;
+  color: #f0f6ff;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: "Outfit", sans-serif;
+}
+
+.font-mono,
+.tabular {
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* animated background grid + glow */
+.tartan-bg {
+  background-color: #070b14;
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(0, 240, 255, 0.08), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(0, 255, 102, 0.07), transparent 45%),
+    linear-gradient(rgba(30, 45, 74, 0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 45, 74, 0.25) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+}
+
+.neon-cyan {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.28);
+}
+.neon-lime {
+  box-shadow: 0 0 20px rgba(0, 255, 102, 0.28);
+}
+
+.glass {
+  background: rgba(14, 21, 38, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 18px rgba(0, 240, 255, 0.55);
+}
+.text-glow-lime {
+  text-shadow: 0 0 18px rgba(0, 255, 102, 0.5);
+}
+
+@keyframes ping-slow {
+  0% { transform: scale(1); opacity: 0.7; }
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+.animate-ping-slow {
+  animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-float-up {
+  animation: float-up 0.5s ease-out both;
+}
+
+@keyframes dash-flow {
+  to { stroke-dashoffset: -1000; }
+}
+.dash-flow {
+  stroke-dasharray: 6 8;
+  animation: dash-flow 18s linear infinite;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0b101d; }
+::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #2b3f66; }
+
+::selection {
+  background: rgba(0, 240, 255, 0.3);
+  color: #fff;
+}
