@@ -199,6 +199,7 @@ def member_public(m: dict) -> dict:
         "created_at": m.get("created_at"),
         "is_initiator": m.get("is_initiator", False),
         "avatar_url": f"/api/avatar/{m['share_token']}" if m.get("avatar_path") else None,
+        "spark_number": m.get("spark_number"),
     }
 
 
@@ -298,6 +299,7 @@ async def create_tartan(payload: TartanCreate, request: Request, response: Respo
         "depth": 0,
         "direct_count": 0,
         "downstream_count": 0,
+        "spark_number": 1,
         "created_at": ts,
     }
     await db.members.insert_one(dict(initiator))
@@ -428,6 +430,7 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
         "downstream_count": 0,
         "verified_downstream": 0,
         "avatar_path": avatar_path,
+        "spark_number": (t.get("total_members", 0) + 1),
         "created_at": ts,
     }
     await db.members.insert_one(dict(member))
@@ -484,6 +487,13 @@ async def get_chain(share_token: str):
     reached = [m for m in MILESTONES if dc >= m]
     next_milestone = next((m for m in MILESTONES if m > dc), None)
 
+    total_in_chain = t.get("total_members", 1) if t else 1
+    ahead = await db.members.count_documents(
+        {"tartan_id": me["tartan_id"], "downstream_count": {"$gt": dc}}
+    )
+    rank = ahead + 1
+    percentile = max(1, round((1 - (rank - 1) / max(1, total_in_chain)) * 100))
+
     return {
         "me": member_public(me),
         "inviter": inviter,
@@ -491,6 +501,9 @@ async def get_chain(share_token: str):
         "tartan": tartan_public(t) if t else None,
         "milestones_reached": reached,
         "next_milestone": next_milestone,
+        "rank": rank,
+        "total_in_chain": total_in_chain,
+        "percentile": percentile,
     }
 
 
@@ -748,6 +761,20 @@ async def seed_flagship():
     logger.info("Seeded flagship Puntland tartan with %d members", total)
 
 
+async def backfill_sparks():
+    tokens = await db.tartans.distinct("token")
+    for tok in tokens:
+        missing = await db.members.count_documents({"tartan_id": tok, "spark_number": {"$exists": False}})
+        if not missing:
+            continue
+        allm = await db.members.find(
+            {"tartan_id": tok}, {"id": 1, "created_at": 1, "spark_number": 1}
+        ).sort("created_at", 1).to_list(100000)
+        for idx, m in enumerate(allm):
+            if m.get("spark_number") is None:
+                await db.members.update_one({"id": m["id"]}, {"$set": {"spark_number": idx + 1}})
+
+
 @app.on_event("startup")
 async def on_startup():
     await db.members.create_index("share_token")
@@ -761,6 +788,7 @@ async def on_startup():
         logger.error("storage init failed: %s", e)
     try:
         await seed_flagship()
+        await backfill_sparks()
     except Exception as e:
         logger.error("seed failed: %s", e)
 

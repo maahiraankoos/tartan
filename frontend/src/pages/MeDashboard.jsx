@@ -6,11 +6,14 @@ import { SharePanel } from "@/components/SharePanel";
 import { LineageView } from "@/components/LineageView";
 import { ReportDialog } from "@/components/ReportDialog";
 import { MilestoneCard } from "@/components/MilestoneCard";
+import { PersonalRipple } from "@/components/PersonalRipple";
+import { ChainSigil } from "@/components/ChainSigil";
 import { Avatar } from "@/components/Avatar";
 import { Progress } from "@/components/ui/progress";
 import { useApp } from "@/context/AppContext";
 import { useTartanStream } from "@/hooks/useTartanStream";
 import { fmtNum, mediaUrl } from "@/lib/helpers";
+import { auraFor } from "@/lib/aura";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -96,7 +99,7 @@ export default function MeDashboard() {
     );
   }
 
-  const { me, tartan, next_milestone, milestones_reached } = chain;
+  const { me, tartan, next_milestone, milestones_reached, rank, total_in_chain, percentile } = chain;
   const dc = me.downstream_count || 0;
   const prevMs = milestones_reached?.length ? milestones_reached[milestones_reached.length - 1] : 0;
   const progress = next_milestone ? Math.min(100, Math.round(((dc - prevMs) / (next_milestone - prevMs)) * 100)) : 100;
@@ -151,6 +154,29 @@ export default function MeDashboard() {
           <p className="text-sm text-slate-300">{t("return_hint")}</p>
         </div>
 
+        {/* Spark & spreader status */}
+        {tartan && (
+          <div
+            className="rounded-2xl border p-4 mb-5 flex items-center gap-4 relative overflow-hidden"
+            data-testid="spark-status"
+            style={{
+              borderColor: auraFor(tartan.token).palette.primary + "40",
+              background: `linear-gradient(135deg, ${auraFor(tartan.token).palette.primary}12, #0B101D 60%, ${auraFor(tartan.token).palette.secondary}10)`,
+            }}
+          >
+            <div className="shrink-0"><ChainSigil seed={tartan.token} size={60} /></div>
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-slate-400">Your spark</div>
+              <div className="font-unbounded text-3xl font-black text-white leading-none">#{me.spark_number ?? "—"}</div>
+            </div>
+            <div className="ml-auto text-right">
+              <div className="font-mono text-2xl font-extrabold" style={{ color: auraFor(tartan.token).palette.primary }} data-testid="spreader-rank">#{rank}</div>
+              <div className="text-[10px] uppercase tracking-widest text-slate-400">{t("your_rank")}</div>
+              <div className="text-[10px] text-emerald-400 mt-0.5">Top {percentile}% of {fmtNum(total_in_chain)}</div>
+            </div>
+          </div>
+        )}
+
         <SharePanel shareToken={shareToken} tartanTitle={tartan?.title} />
 
         {/* Milestone progress */}
@@ -189,9 +215,14 @@ export default function MeDashboard() {
           )}
         </div>
 
+        {/* Personal ripple */}
+        <div className="mt-5">
+          <h2 className="font-unbounded text-lg font-bold text-white mb-3">{t("your_chain")}</h2>
+          <PersonalRipple chain={chain} />
+        </div>
+
         {/* Lineage */}
         <div className="mt-5">
-          <h2 className="font-display text-lg font-bold text-white mb-3">{t("your_chain")}</h2>
           <LineageView chain={chain} />
         </div>
 

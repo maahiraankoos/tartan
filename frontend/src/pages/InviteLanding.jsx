@@ -4,6 +4,8 @@ import { Loader2, Users, TrendingUp, MapPin, ArrowRight } from "lucide-react";
 import { Header } from "@/components/Header";
 import { TrustBadges } from "@/components/TrustBadges";
 import { JoinModal } from "@/components/JoinModal";
+import { JoinReveal } from "@/components/JoinReveal";
+import { ChainSigil } from "@/components/ChainSigil";
 import { Avatar } from "@/components/Avatar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { useApp, saveMembership, getMembership } from "@/context/AppContext";
@@ -20,6 +22,7 @@ export default function InviteLanding() {
   const [error, setError] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [reveal, setReveal] = useState(null);
   const { stats: liveStats } = useTartanStream(ctx?.tartan?.token);
 
   useEffect(() => {
@@ -42,8 +45,14 @@ export default function InviteLanding() {
         idempotency_key: crypto.randomUUID(),
       });
       saveMembership(ctx.tartan.token, data.member.share_token);
-      toast.success("You're in the chain!");
-      navigate(`/me/${data.member.share_token}`);
+      setJoinOpen(false);
+      setReveal({
+        sparkNumber: data.member.spark_number,
+        chainName: ctx.tartan.title,
+        chainSeed: ctx.tartan.token,
+        city: data.member.city,
+        shareToken: data.member.share_token,
+      });
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Could not join");
     } finally {
@@ -88,9 +97,12 @@ export default function InviteLanding() {
             </p>
           </div>
 
-          <div className="mt-5 rounded-2xl bg-white/5 border border-slate-700/60 p-4">
-            <h1 className="font-display font-bold text-xl text-white">{tartan.title}</h1>
-            <p className="text-sm text-slate-400 mt-1">{tartan.goal}</p>
+          <div className="mt-5 rounded-2xl bg-white/5 border border-slate-700/60 p-4 flex items-center gap-3 text-left">
+            <div className="shrink-0"><ChainSigil seed={tartan.token} size={54} /></div>
+            <div className="min-w-0">
+              <h1 className="font-unbounded font-bold text-lg text-white leading-tight">{tartan.title}</h1>
+              <p className="text-sm text-slate-400 mt-0.5">{tartan.goal}</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
@@ -140,6 +152,12 @@ export default function InviteLanding() {
         loading={joining}
         inviterName={inviter.nickname}
         inviterAvatar={mediaUrl(inviter.avatar_url)}
+      />
+
+      <JoinReveal
+        open={!!reveal}
+        {...(reveal || {})}
+        onContinue={() => { const st = reveal.shareToken; setReveal(null); navigate(`/me/${st}`); }}
       />
     </>
   );

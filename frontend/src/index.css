@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -116,4 +116,45 @@ h3,
 ::selection {
   background: rgba(0, 240, 255, 0.3);
   color: #fff;
+}
+
+.font-unbounded {
+  font-family: "Unbounded", "Outfit", sans-serif;
+}
+
+@keyframes shockwave {
+  0% { transform: scale(0); opacity: 0.8; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+.animate-shockwave { animation: shockwave 1s ease-out forwards; }
+
+@keyframes radar-ring {
+  0% { transform: scale(0.4); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.animate-radar { animation: radar-ring 1.8s ease-out infinite; }
+
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin-slow 22s linear infinite; }
+.spin-slow-rev { animation: spin-slow 30s linear infinite reverse; }
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+.animate-breathe { animation: breathe 4s ease-in-out infinite; }
+
+@keyframes aura-pulse {
+  0%, 100% { filter: drop-shadow(0 0 8px currentColor); }
+  50% { filter: drop-shadow(0 0 22px currentColor); }
+}
+.animate-aura-pulse { animation: aura-pulse 3s ease-in-out infinite; }
+
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }

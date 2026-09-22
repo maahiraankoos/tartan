@@ -5,8 +5,10 @@ import { Header } from "@/components/Header";
 import { GlobalStats } from "@/components/GlobalStats";
 import { ChainMap } from "@/components/ChainMap";
 import { JoinModal } from "@/components/JoinModal";
+import { JoinReveal } from "@/components/JoinReveal";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Avatar } from "@/components/Avatar";
+import { ChainSigil } from "@/components/ChainSigil";
 import { useApp, saveMembership, getMembership } from "@/context/AppContext";
 import { useTartanStream } from "@/hooks/useTartanStream";
 import api from "@/lib/api";
@@ -19,6 +21,7 @@ export default function TartanView() {
   const [payload, setPayload] = useState(null);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [reveal, setReveal] = useState(null);
   const myShare = getMembership(token);
 
   const { stats: liveStats } = useTartanStream(token, {
@@ -49,8 +52,14 @@ export default function TartanView() {
         idempotency_key: crypto.randomUUID(),
       });
       saveMembership(token, data.member.share_token);
-      toast.success("You're in the chain!");
-      navigate(`/me/${data.member.share_token}`);
+      setJoinOpen(false);
+      setReveal({
+        sparkNumber: data.member.spark_number,
+        chainName: tartan?.title,
+        chainSeed: token,
+        city: data.member.city,
+        shareToken: data.member.share_token,
+      });
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Could not join");
     } finally {
@@ -71,7 +80,7 @@ export default function TartanView() {
         {tartan && (
           <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-[#0E1526] to-[#12233b] p-6 mb-6">
             <div className="flex items-start gap-4">
-              <Avatar name={tartan.initiator_nickname || tartan.title} size={56} ring />
+              <div className="shrink-0"><ChainSigil seed={token} size={64} /></div>
               <div className="min-w-0 flex-1">
                 {tartan.featured && (
                   <span className="text-[10px] uppercase tracking-widest text-amber-400">{t("featured")}</span>
@@ -123,6 +132,11 @@ export default function TartanView() {
       </main>
 
       <JoinModal open={joinOpen} onOpenChange={setJoinOpen} onJoin={doJoin} loading={joining} />
+      <JoinReveal
+        open={!!reveal}
+        {...(reveal || {})}
+        onContinue={() => { const st = reveal.shareToken; setReveal(null); navigate(`/me/${st}`); }}
+      />
     </>
   );
 }
