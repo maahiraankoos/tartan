@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Share2, Download, Trophy } from "lucide-react";
 import confetti from "canvas-confetti";
 import { useApp } from "@/context/AppContext";
@@ -112,6 +112,7 @@ export const MilestoneCard = ({ open, onOpenChange, milestone, tartanTitle, nick
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="glass border-cyan-500/40 sm:max-w-sm" data-testid="milestone-card-modal">
+        <DialogTitle className="sr-only">Milestone reached</DialogTitle>
         <div className="flex flex-col items-center gap-4 py-1">
           <div className="flex items-center gap-2 text-amber-300 font-display font-bold">
             <Trophy size={18} /> {t("milestone_reached")}

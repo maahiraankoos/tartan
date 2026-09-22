@@ -32,16 +32,19 @@ A shareable, no-download human referral chain (mobile-first PWA). People start o
 - ✅ WhatsApp/SMS/native/copy/QR share panel
 - ✅ Report dialog; EN/SO bilingual toggle (persisted)
 - ✅ Flagship "Puntland" seeded chain (~40 members)
-- ✅ Live polling refresh (~6s); PWA manifest + dark theme
-- ✅ Tested: 13/13 backend pytest, 100% frontend flows
+- ✅ PWA manifest + dark theme
+- ✅ **Real-Time Pulse**: SSE stream (`/api/tartans/{token}/stream`) pushes live stats + join events; counters update instantly, incoming-join toasts (iteration 2)
+- ✅ **Milestone Moments**: confetti burst + downloadable/shareable canvas card on crossing 10/25/50/100/... (iteration 2)
+- ✅ **Organizer Dashboard**: initiator-only analytics at `/dashboard/{share}` — cumulative reach area chart, depth-distribution bars, geographic spread, top branches (iteration 2)
+- ✅ **Avatar Uploads**: optional profile photo via Emergent object storage; generated gradient icon fallback; owner-only update via device cookie (iteration 2)
+- ✅ Tested: 20/20 backend pytest, 100% frontend flows across both iterations
 
 ## Backlog (prioritized)
-- P1: Hide initiator_share_token from public list; add DialogDescription for a11y
-- P1: Real-time push (WebSocket/SSE) instead of polling
-- P2: Optional avatar uploads (object storage)
+- P1: Hide initiator_share_token from public list response
+- P2: SSE across multiple workers (needs Redis pub/sub for scale-out); debounce stats emission
+- P2: Offload avatar byte reads off the event loop (threadpool/aiohttp)
 - P2: Passkey for initiators; ancestor batch-update optimization for deep trees
-- P2: Org/creator analytics dashboard tier (monetization)
-- P2: Chain templates (fundraiser, event, challenge); verified initiator badges
+- P2: Org/creator paid analytics tier; chain templates; verified initiator badges
 
 ## Next Tasks
 - Gather user feedback on the core loop and map UX before deepening features.

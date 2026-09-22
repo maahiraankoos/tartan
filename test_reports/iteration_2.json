@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 2 testing (SSE real-time, avatar uploads, organizer dashboard, milestone moments). Backend: 7/7 pytest passed covering analytics access control (initiator OK, non-initiator 403, unknown 403), avatar upload/attach/serve, member avatar update with device-cookie ownership (200 same-device / 403 different-device), non-image rejection, and SSE stream (initial 'stats' event + 'join' event on live join). Frontend: OrganizerDashboard at /dashboard/j4atawQ7lw renders all 4 analytics stat cards, chart-reach, chart-depth, geo-spread, top-branches, dashboard-back-link. Non-initiator /dashboard/{unknown} shows 'not authorized'. /me/j4atawQ7lw shows organizer-dashboard-link; /me for freshly-joined member did not (verified via existence-only check on initiator page). Milestone badges render (3 reached badges); clicking opens milestone-card-modal with milestone-canvas + share/download buttons. change-avatar-button visible on /me. JoinModal on /j/j4atawQ7lw exposes avatar-upload-trigger and avatar-file-input. SSE real-time: opening /t/puntland and triggering a join via a separate requests.Session produced an in-page toast 'TEST_SSE_UI \u00b7 Dubai just joined the chain' and counter updates without refresh. Regression: prior iteration 1 tests still pass (13/13).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "MilestoneCard modal", "issues": ["Radix DialogContent still missing DialogTitle/Description — accessibility console warning (non-blocking, same as iteration 1)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/test_tartan_api.py",
+    "/app/test_reports/pytest/iteration2_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add DialogTitle (or VisuallyHidden wrapper) to MilestoneCard and other dialogs to resolve Radix a11y warnings."
+  ],
+  "critical_code_review_comments": [
+    "SSE endpoint uses in-process pub/sub via defaultdict of queues — works for single-worker MVP but will not broadcast across multiple uvicorn workers or replicas. Fine for now; document for scale-out.",
+    "publish() calls compute_stats after every join, which runs 2 count_documents + distinct queries per subscriber fan-out. At high write volume consider throttling stats emission (e.g. debounce to 500ms) — currently emits per-join.",
+    "get_avatar reads bytes via requests.get in a sync call inside async endpoint (blocks event loop). Acceptable for small avatars behind Cache-Control:3600 but consider aiohttp or offloading to threadpool.",
+    "Avatar upload path binds by device cookie only — a shared device (family/kiosk) can overwrite anyone's avatar joined from that device. Acceptable trade-off given anonymous model.",
+    "OrganizerDashboard polls /analytics every 8s in addition to SSE — could subscribe to SSE stats events instead to reduce load."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration2.py"],
+  "success_rate": {"backend": "100% (7/7 new + 13/13 regression)", "frontend": "100% of tested flows"},
+  "test_credentials": "No auth. Flagship tartan 'puntland'; initiator share 'j4atawQ7lw' (Amina).",
+  "seed_data_creation": "Backend tests created a handful of TEST_ members on puntland (TEST_NonInit, TEST_Avatar, TEST_AvOwn, TEST_SSE, TEST_SSE_UI). Not cleaned up; harmless for regression.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run new tests via `pytest backend/tests/test_iteration2.py -v` (uses REACT_APP_BACKEND_URL from /app/frontend/.env fallback). SSE test uses threading + requests stream, reads until 3 events observed. For frontend SSE verification, open /t/puntland, then in a separate requests.Session POST /api/tartans/puntland/join — an on-screen toast appears within ~2s (sonner). Avatar ownership relies on the httponly `td` cookie; a fresh requests.Session gets a new cookie and therefore 403 on /members/{share}/avatar.",
+  "rca of the issue": "N/A — no functional bugs discovered."
+}
