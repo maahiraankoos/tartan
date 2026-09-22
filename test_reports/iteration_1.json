@@ -1,0 +1,36 @@
+{
+  "summary": "Full backend + frontend testing of Tartan PWA. 13/13 backend pytest cases pass covering root, list tartans, get tartan+stats, map, share/invite context, create tartan (with persistence), join flow with parent attribution, chain lineage, idempotency, verified/unverified device split, tartan-level verified counter increment, reports, and 404s. Frontend Playwright covered: home loads with featured Puntland card + total reach counter, language toggle EN<->SO, Start Tartan modal creates tartan and redirects to /me/{share}, /me dashboard renders share link + copy + WA/SMS/native/QR buttons + QR modal with SVG + milestone progress + lineage, /t/puntland shows global-stats + chain-map + zoom in/out controls, join flow from tartan view attaches under initiator (Amina shown as inviter in lineage), membership persisted in localStorage (View-my-branch button shown on revisit), /j/j4atawQ7lw invite landing shows inviter avatar + headline + live preview stats + Join CTA, Report dialog submits successfully and shows moderator toast.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/tartans/{token}", "issue": "initiator_share_token is exposed in tartan_public serialization; if this is intentional for owner-flows it is fine, but it lets anyone using /api/tartans (list) fetch the flagship then read the initiator's private share link. Consider hiding for non-owners."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "All dialogs (JoinModal, StartTartanDialog, ReportDialog, QR modal)", "issues": ["Radix DialogContent missing Description/aria-describedby — accessibility warning in console (non-blocking)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_tartan_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Optional) Add DialogDescription or aria-describedby to Radix DialogContent to remove a11y warnings.",
+    "(Optional) Consider hiding initiator_share_token from the public /api/tartans list response since it grants inviter-attribution power."
+  ],
+  "critical_code_review_comments": [
+    "server.py join_tartan walks ancestors serially with N async round-trips per join — fine for MVP but O(depth) per write; consider batch $inc with an ancestors[] array cached on member docs for deeper trees.",
+    "verified_downstream is incremented on ancestors but never set to 0 at member creation — reads via $inc auto-init to 0, but explicit init in the member doc would be cleaner and prevent missing-field foot-guns.",
+    "In-memory _ip_hits rate limiter is per-process; will not work behind multiple workers. Acceptable for MVP.",
+    "SharePanel uses window.location.origin for share URL — correct; note that opening /j/{token} on same origin will attach share cookie context correctly.",
+    "TartanView.doJoin sends parent_share_token: null so backend falls back to tartan.initiator_share_token — matches spec ('attaches under the initiator').",
+    "Home totalReach sums verified_members of all tartans — reasonable, but AnimatedNumber tween may briefly display low values during load."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% of tested flows"},
+  "test_credentials": "No auth. Puntland tartan token; flagship initiator share token j4atawQ7lw (Amina).",
+  "seed_data_creation": "Backend seed_flagship created ~41 Puntland members on startup (idempotent by featured:true). UI test created 1 TEST_UI_Chain and a couple of TEST_ joiners; not cleaned up (kept for regression). No production data touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest at /app/backend/tests/test_tartan_api.py — run with `pytest backend/tests/test_tartan_api.py -v`. Verified/unverified split is enforced by same-device cookie; requests.Session preserves the httponly `td` cookie for backend tests. Frontend uses REACT_APP_BACKEND_URL and axios withCredentials:true; localStorage.clear() resets the 'membership' cache so /t/puntland shows Join CTA again. Note the flagship initiator share token 'j4atawQ7lw' is the seeded value and matches production; the backend seed also seeded from the `TARTAN_SECRET` in .env — do not change it."
+}
