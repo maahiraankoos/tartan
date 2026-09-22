@@ -96,18 +96,18 @@ export default function Home() {
                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 animate-ping" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
               </span>
-              LIVE · SYNAPSE ACTIVE
+              LIVE · UPDATING NOW
             </motion.div>
 
             <motion.h1 variants={item} className="font-unbounded text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white">
-              Ideas don't travel<br />in straight lines.
+              One idea.<br />Passed hand to hand.
               <span className="block mt-2" style={{ color: "#00F0FF", textShadow: "0 0 34px rgba(0,240,255,0.5)" }}>
-                They ignite people.
+                See how far it goes.
               </span>
             </motion.h1>
 
             <motion.p variants={item} className="text-slate-300 text-base sm:text-lg mt-5 leading-relaxed max-w-lg">
-              {t("tagline")} Pass a spark, watch it leap city to city, person to person — in real time.
+              {t("tagline")} Share a link and watch it move from city to city, in real time.
             </motion.p>
 
             <motion.div variants={item} className="mt-7 flex flex-wrap items-center gap-3">
@@ -118,7 +118,7 @@ export default function Home() {
                   className="group relative flex items-center gap-2 h-14 px-7 rounded-full font-unbounded font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 active:scale-[0.97] transition-transform overflow-hidden"
                 >
                   <span className="absolute inset-0 bg-white/30 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                  <Zap size={18} className="relative" /> <span className="relative">Ignite your spark</span>
+                  <Zap size={18} className="relative" /> <span className="relative">{t("join_cta")}</span>
                 </Link>
               )}
               <StartTartanDialog />
@@ -132,7 +132,7 @@ export default function Home() {
               <span className="font-mono text-2xl font-extrabold text-white">
                 <AnimatedNumber value={totalReach} />
               </span>
-              {t("people_reached")} across the network
+              {t("people_reached")} so far
             </motion.div>
           </motion.div>
         </section>

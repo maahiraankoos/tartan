@@ -7,6 +7,7 @@ import { LineageView } from "@/components/LineageView";
 import { ReportDialog } from "@/components/ReportDialog";
 import { MilestoneCard } from "@/components/MilestoneCard";
 import { PersonalRipple } from "@/components/PersonalRipple";
+import { RipplePoster } from "@/components/RipplePoster";
 import { ChainSigil } from "@/components/ChainSigil";
 import { Avatar } from "@/components/Avatar";
 import { Progress } from "@/components/ui/progress";
@@ -217,7 +218,10 @@ export default function MeDashboard() {
 
         {/* Personal ripple */}
         <div className="mt-5">
-          <h2 className="font-unbounded text-lg font-bold text-white mb-3">{t("your_chain")}</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-unbounded text-lg font-bold text-white">{t("your_chain")}</h2>
+            <RipplePoster chain={chain} shareToken={shareToken} />
+          </div>
           <PersonalRipple chain={chain} />
         </div>
 

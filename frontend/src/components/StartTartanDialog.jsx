@@ -79,8 +79,8 @@ export const StartTartanDialog = ({ trigger }) => {
           >
             <ChainSigil seed={seed} size={72} />
             <div className="min-w-0">
-              <div className="font-mono text-[10px] uppercase tracking-widest text-slate-400">Your chain aura</div>
-              <div className="font-unbounded font-bold text-white truncate">{title.trim() || "Untitled spark"}</div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-slate-400">Your chain style</div>
+              <div className="font-unbounded font-bold text-white truncate">{title.trim() || "Untitled chain"}</div>
               <div className="text-xs" style={{ color: aura.palette.primary }}>{aura.palette.name}</div>
             </div>
           </div>
@@ -119,7 +119,7 @@ export const StartTartanDialog = ({ trigger }) => {
               style={{ background: `linear-gradient(90deg, ${aura.palette.primary}, ${aura.palette.secondary})` }}
             >
               {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-              {loading ? t("creating") : "Light the spark"}
+              {loading ? t("creating") : "Create chain"}
             </button>
           </form>
         </DialogContent>

@@ -57,7 +57,7 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
           <div className="relative w-full max-w-sm text-center">
             {/* Spark number */}
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: stage >= 1 ? 1 : 0 }} className="font-mono text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">
-              {isInitiator ? "You lit the spark" : "You joined the chain"}
+              {isInitiator ? "You started the chain" : "You joined the chain"}
             </motion.p>
             <motion.div
               initial={{ scale: 0.6, opacity: 0 }}
@@ -72,7 +72,7 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
               </span>
             </motion.div>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: stage >= 1 ? 1 : 0 }} className="text-slate-300 mt-2">
-              Spark in <span className="font-semibold text-white">{chainName}</span>
+              in <span className="font-semibold text-white">{chainName}</span>
             </motion.p>
 
             {/* Sigil */}
@@ -105,7 +105,7 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
               animate={stage >= 4 ? { opacity: 1, y: 0 } : {}}
               className="mt-8 space-y-3"
             >
-              <p className="text-xs text-slate-400">{isInitiator ? "Now light it up — send the first spark." : "Now keep it moving — pass your spark on."}</p>
+              <p className="text-xs text-slate-400">{isInitiator ? "Now share it. Send the first invite." : "Now share your link so the chain keeps growing."}</p>
               <a
                 data-testid="reveal-whatsapp-button"
                 href={`https://wa.me/?text=${encodeURIComponent(msg)}`}

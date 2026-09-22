@@ -121,7 +121,7 @@ export const PersonalRipple = ({ chain }) => {
 
       {directs.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="text-slate-500 text-sm text-center px-8">Share your link — the first spark you pass on appears here.</p>
+          <p className="text-slate-500 text-sm text-center px-8">Share your link. The first person you invite will show up here.</p>
         </div>
       )}
     </div>
