@@ -658,7 +658,8 @@ async def share_landing(token: str, request: Request):
     browsers into the SPA invite page."""
     m = await db.members.find_one({"share_token": token}, {"_id": 0})
     base = _public_base(request)
-    app_url = f"/j/{token}"
+    frontend_base = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    app_url = f"{frontend_base}/j/{token}" if frontend_base else f"/j/{token}"
     if not m:
         title, desc, image = "Tartan — the living human chain", "Join a chain and watch one idea travel person to person.", f"{base}/api/og/none.png"
     else:
