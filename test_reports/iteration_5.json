@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 5 backend + frontend virality features fully validated. 11/11 backend pytest cases passing (leaderboard, verified_organizer/goal_target on tartan_public, share ctx inviter rank/percentile, chain streak, notifications create+read, recap, profile, milestone SSE crossing 10). Frontend: /t/puntland renders Top sparks (20 rows) + City race + verified-org-badge next to Amina; /p/j4atawQ7lw profile card shows nickname, OG, verified, Spark #1, rank, downstream/direct stats; /me/Amina shows spark-status with StreakBadge, weekly-recap-chip, my-profile-link, and NotificationsFeed. Poster format toggle post 4:5 <-> story 9:16 both regenerate valid data:image/png PNG. Fresh chain with goal_target=50 shows goal-meter on both /t/{token} and /j/{share}. Notifications 'you unlocked this' end-to-end verified: a join creates a direct notification for parent, unread dot shows, mark-read clears. Milestone SSE fires 'milestone' event with value=10 after 9 joins on a fresh chain. Personal ripple, spark-status, spreader-rank still render on MeDashboard.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration5.py",
+    "/app/test_reports/pytest/iteration5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "BUG FIXED by tester: /app/frontend/src/components/RipplePoster.jsx used `useEffect` without importing it (only useRef/useState were imported). This would throw ReferenceError as soon as the Ripple Poster component mounted (line 207). ESLint confirmed `'useEffect' is not defined (no-undef)`. Added useEffect to the import; poster + format toggle now regenerate correctly for both 4:5 and 9:16.",
+    "server.py seed_flagship() sets total/verified totals but leaves goal_target unset (falsy) on puntland — expected, but consider seeding a sample goal_target for demo (optional).",
+    "TartanView passes `stats?.verified_members ?? tartan.verified_members` to GoalMeter — matches the docstring 'current=verified_members'. Consistent with backend `verified_organizer = verified_members>=25`.",
+    "Notifications endpoint creates ancestor notifications for up to 3 nearest ancestors on every join; consider deduping / TTL if chains grow to thousands of joins/hour (not blocking).",
+    "Chain 'streak' only inspects the first 50 directs (sort desc by created_at, limit 50). If a member had a burst of >50 directs on a single recent day, historical streak days would be truncated. Low probability but a note."
+  ],
+  "updated_files": ["/app/frontend/src/components/RipplePoster.jsx"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100%"},
+  "test_credentials": "No auth. puntland flagship, Amina share=j4atawQ7lw. Fresh TEST_ chains created and pruned by app cadence.",
+  "seed_data_creation": "Created via API: TEST_notif, TEST_milestone, TEST_notifUI, TEST_goal_ui, TEST_goal_chain chains + several TEST_ member joins. All prefixed with TEST_ for identification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "backend_test file: /app/backend/tests/test_iteration5.py. Milestone SSE test uses threading + requests stream=True; needs a fresh chain then 9 joins with independent requests.Session() cookies. For UI, use API-backed setup via page.evaluate to create test chains fast, then navigate to /me/{share} to observe notifications-feed + streak + weekly-recap-chip.",
+  "rca of the issue": "RipplePoster.jsx: `useEffect(() => { if (open) { ... } }, [format])` was calling an undefined identifier because the import statement omitted useEffect. Root cause: partial refactor when adding the format state that introduced a new effect but did not update the destructured React imports. Reproduction: click export-poster-button on /me/{share} — component would throw at render. Mitigation: added useEffect to import list; ESLint clean; verified in browser (both format buttons regenerate a valid data:image/png)."
+}
