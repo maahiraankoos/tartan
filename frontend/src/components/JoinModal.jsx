@@ -12,11 +12,12 @@ import { Avatar } from "@/components/Avatar";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
-export const JoinModal = ({ open, onOpenChange, onJoin, inviterName, inviterAvatar, loading }) => {
+export const JoinModal = ({ open, onOpenChange, onJoin, inviterName, inviterAvatar, loading, teams = [] }) => {
   const { t } = useApp();
   const [nickname, setNickname] = useState("");
   const [realName, setRealName] = useState("");
   const [city, setCity] = useState("");
+  const [team, setTeam] = useState("");
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarFileId, setAvatarFileId] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -57,6 +58,7 @@ export const JoinModal = ({ open, onOpenChange, onJoin, inviterName, inviterAvat
       nickname: nickname.trim(),
       real_name: realName.trim() || null,
       city: city || null,
+      team: team || null,
       avatar_file_id: avatarFileId,
     });
   };
@@ -142,6 +144,25 @@ export const JoinModal = ({ open, onOpenChange, onJoin, inviterName, inviterAvat
               </SelectContent>
             </Select>
           </div>
+
+          {teams && teams.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-fuchsia-300 text-xs flex items-center gap-1">⚔️ {t("pick_team")}</Label>
+              <div className="flex flex-wrap gap-2" data-testid="team-picker">
+                {teams.map((tm) => (
+                  <button
+                    type="button"
+                    key={tm}
+                    data-testid={`team-choice-${tm}`}
+                    onClick={() => setTeam(team === tm ? "" : tm)}
+                    className={`px-3 py-2 rounded-full text-sm font-semibold border transition-all ${team === tm ? "bg-fuchsia-500/20 border-fuchsia-400 text-fuchsia-200" : "border-slate-700 text-slate-300 hover:border-fuchsia-500/50"}`}
+                  >
+                    {tm}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

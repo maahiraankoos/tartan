@@ -9,7 +9,8 @@ import { MilestoneCard } from "@/components/MilestoneCard";
 import { PersonalRipple } from "@/components/PersonalRipple";
 import { RipplePoster } from "@/components/RipplePoster";
 import { NotificationsFeed } from "@/components/NotificationsFeed";
-import { StreakBadge, OGBadge } from "@/components/Badges";
+import { PushButton } from "@/components/PushButton";
+import { StreakBadge, OGBadge, RewardBadge, RewardStrip } from "@/components/Badges";
 import { ChainSigil } from "@/components/ChainSigil";
 import { Avatar } from "@/components/Avatar";
 import { Progress } from "@/components/ui/progress";
@@ -186,19 +187,27 @@ export default function MeDashboard() {
             </div>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10 flex-wrap">
               <StreakBadge streak={chain.streak} />
+              <RewardBadge reward={me.reward} />
               {recap && recap.invited_this_week > 0 && (
                 <span className="text-xs text-emerald-300 font-semibold border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2.5 py-1" data-testid="weekly-recap-chip">
                   +{fmtNum(recap.invited_this_week)} {t("invited_this_week")}
                 </span>
               )}
-              <Link to={`/p/${shareToken}`} data-testid="my-profile-link" className="ml-auto text-xs font-semibold text-cyan-300 hover:text-cyan-200">
-                {t("my_profile")} →
-              </Link>
+              <div className="ml-auto flex items-center gap-3">
+                <PushButton shareToken={shareToken} />
+                <Link to={`/p/${shareToken}`} data-testid="my-profile-link" className="text-xs font-semibold text-cyan-300 hover:text-cyan-200">
+                  {t("my_profile")} →
+                </Link>
+              </div>
             </div>
           </div>
         )}
 
         <NotificationsFeed shareToken={shareToken} refreshKey={dc} />
+
+        <div className="mt-5">
+          <RewardStrip directCount={me.direct_count || 0} />
+        </div>
 
         <div className="mt-5">
           <SharePanel shareToken={shareToken} tartanTitle={tartan?.title} />

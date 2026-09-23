@@ -26,6 +26,7 @@ export const StartTartanDialog = ({ trigger }) => {
   const [city, setCity] = useState("");
   const [nickname, setNickname] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
+  const [teams, setTeams] = useState("");
   const [reveal, setReveal] = useState(null);
 
   const seed = title.trim() || "your new chain";
@@ -39,6 +40,7 @@ export const StartTartanDialog = ({ trigger }) => {
       const { data } = await api.post("/tartans", {
         title: title.trim(), goal: goal.trim(), city: city || null, nickname: nickname.trim(),
         goal_target: goalTarget ? parseInt(goalTarget, 10) : null,
+        teams: teams ? teams.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6) : null,
       });
       saveMembership(data.tartan.token, data.member.share_token);
       setOpen(false);
@@ -99,6 +101,10 @@ export const StartTartanDialog = ({ trigger }) => {
             <div className="space-y-1.5">
               <Label className="text-slate-300 text-xs">{t("chain_goal")} <span className="text-slate-500">· {t("goal_people")} (optional)</span></Label>
               <Input data-testid="tartan-goaltarget-input" type="number" min="0" value={goalTarget} onChange={(e) => setGoalTarget(e.target.value)} placeholder="e.g. 1000" className="bg-slate-900/70 border-slate-700 text-white h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-300 text-xs">⚔️ {t("teams_field")} <span className="text-slate-500">· {t("teams_hint")}</span></Label>
+              <Input data-testid="tartan-teams-input" value={teams} onChange={(e) => setTeams(e.target.value)} placeholder="Garowe Crew, Bosaso Crew" className="bg-slate-900/70 border-slate-700 text-white h-11" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

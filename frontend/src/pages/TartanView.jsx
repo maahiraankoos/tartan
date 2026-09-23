@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { GlobalStats } from "@/components/GlobalStats";
 import { ChainMap } from "@/components/ChainMap";
 import { Leaderboard } from "@/components/Leaderboard";
-import { CityRace, GoalMeter } from "@/components/CityRace";
+import { CityRace, GoalMeter, TeamBattle } from "@/components/CityRace";
 import { MilestoneTakeover } from "@/components/MilestoneTakeover";
 import { JoinModal } from "@/components/JoinModal";
 import { JoinReveal } from "@/components/JoinReveal";
@@ -138,12 +138,18 @@ export default function TartanView() {
           <CityRace token={token} refreshKey={stats?.total_members || 0} />
         </div>
 
+        {tartan?.teams && tartan.teams.length > 0 && (
+          <div className="mt-6">
+            <TeamBattle token={token} teams={tartan.teams} refreshKey={stats?.total_members || 0} />
+          </div>
+        )}
+
         <div className="mt-6 flex justify-end">
           <ReportDialog tartanToken={token} />
         </div>
       </main>
 
-      <JoinModal open={joinOpen} onOpenChange={setJoinOpen} onJoin={doJoin} loading={joining} />
+      <JoinModal open={joinOpen} onOpenChange={setJoinOpen} onJoin={doJoin} loading={joining} teams={tartan?.teams} />
       <JoinReveal
         open={!!reveal}
         {...(reveal || {})}

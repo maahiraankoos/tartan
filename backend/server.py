@@ -11,6 +11,7 @@ import logging
 import time
 import json
 import uuid
+import base64
 import asyncio
 import requests
 from pathlib import Path
@@ -86,6 +87,67 @@ async def publish(token: str, event: dict):
             q.put_nowait(event)
         except Exception:
             pass
+
+
+# ---- Web Push (VAPID) ----
+VAPID_SUB = "mailto:admin@tartan.app"
+
+
+async def get_vapid():
+    cfg = await db.config.find_one({"_id": "vapid"})
+    if cfg:
+        return cfg["private_pem"], cfg["public_key"]
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import serialization
+    priv = ec.generate_private_key(ec.SECP256R1())
+    priv_pem = priv.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    ).decode()
+    pub_bytes = priv.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+    )
+    public_key = base64.urlsafe_b64encode(pub_bytes).rstrip(b"=").decode()
+    await db.config.insert_one({"_id": "vapid", "private_pem": priv_pem, "public_key": public_key})
+    return priv_pem, public_key
+
+
+def _send_webpush(subscription: dict, payload: str, priv_pem: str) -> bool:
+    """Returns False if the subscription is dead and should be removed."""
+    from pywebpush import webpush, WebPushException
+    try:
+        webpush(subscription_info=subscription, data=payload, vapid_private_key=priv_pem,
+                vapid_claims={"sub": VAPID_SUB})
+        return True
+    except WebPushException as e:
+        code = getattr(getattr(e, "response", None), "status_code", None)
+        return code not in (404, 410)
+    except Exception:
+        return True
+
+
+async def push_to_member(member_id: str, title: str, body: str, url: str):
+    subs = await db.push_subs.find({"member_id": member_id}).to_list(50)
+    if not subs:
+        return
+    priv_pem, _ = await get_vapid()
+    payload = json.dumps({"title": title, "body": body, "url": url})
+    for s in subs:
+        try:
+            keep = await asyncio.to_thread(_send_webpush, s["subscription"], payload, priv_pem)
+            if not keep:
+                await db.push_subs.delete_one({"_id": s["_id"]})
+        except Exception as e:
+            logger.error("push failed: %s", e)
+
+
+def reward_for(direct_count: int) -> dict:
+    if direct_count >= 100:
+        return {"tier": 3, "name": "Igniter", "next": None}
+    if direct_count >= 50:
+        return {"tier": 2, "name": "Connector", "next": 100}
+    if direct_count >= 10:
+        return {"tier": 1, "name": "Starter", "next": 50}
+    return {"tier": 0, "name": None, "next": 10}
 
 
 app = FastAPI()
@@ -164,6 +226,7 @@ class TartanCreate(BaseModel):
     nickname: str
     real_name: Optional[str] = None
     goal_target: Optional[int] = None
+    teams: Optional[List[str]] = None
 
 
 class JoinCreate(BaseModel):
@@ -173,6 +236,7 @@ class JoinCreate(BaseModel):
     parent_share_token: Optional[str] = None
     idempotency_key: Optional[str] = None
     avatar_file_id: Optional[str] = None
+    team: Optional[str] = None
 
 
 class ReportCreate(BaseModel):
@@ -201,6 +265,8 @@ def member_public(m: dict) -> dict:
         "is_initiator": m.get("is_initiator", False),
         "avatar_url": f"/api/avatar/{m['share_token']}" if m.get("avatar_path") else None,
         "spark_number": m.get("spark_number"),
+        "team": m.get("team"),
+        "reward": reward_for(m.get("direct_count", 0)),
     }
 
 
@@ -219,6 +285,7 @@ def tartan_public(t: dict) -> dict:
         "max_depth": t.get("max_depth", 0),
         "goal_target": t.get("goal_target"),
         "verified_organizer": t.get("verified_members", 0) >= 25,
+        "teams": t.get("teams") or [],
         "created_at": t.get("created_at"),
     }
 
@@ -292,6 +359,7 @@ async def create_tartan(payload: TartanCreate, request: Request, response: Respo
         "verified_members": 1,
         "max_depth": 0,
         "goal_target": (payload.goal_target if payload.goal_target and payload.goal_target > 0 else None),
+        "teams": [x.strip()[:24] for x in (payload.teams or []) if x and x.strip()][:6],
         "created_at": ts,
     }
     await db.tartans.insert_one(dict(tartan))
@@ -447,6 +515,7 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
         "verified_downstream": 0,
         "avatar_path": avatar_path,
         "spark_number": (t.get("total_members", 0) + 1),
+        "team": (payload.team.strip()[:24] if payload.team and payload.team.strip() and payload.team in (t.get("teams") or []) else None),
         "created_at": ts,
     }
     await db.members.insert_one(dict(member))
@@ -480,6 +549,22 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
         ancestor_id = anc.get("parent_id")
     if notif_docs:
         await db.notifications.insert_many(notif_docs)
+
+    # push the direct parent (fire and forget)
+    asyncio.create_task(push_to_member(
+        parent["id"], "Someone joined through you! ⚡",
+        f"{member['nickname']} · {member['city']} joined your chain",
+        f"/me/{parent['share_token']}",
+    ))
+    # invite reward crossing
+    new_direct = parent.get("direct_count", 0) + 1
+    if new_direct in (10, 50, 100):
+        r = reward_for(new_direct)
+        asyncio.create_task(push_to_member(
+            parent["id"], f"Reward unlocked: {r['name']}! 🏆",
+            f"You've invited {new_direct} people. New badge and aura unlocked.",
+            f"/me/{parent['share_token']}",
+        ))
 
     prev_total = t.get("total_members", 0)
     await db.tartans.update_one(
@@ -775,6 +860,53 @@ async def profile(share_token: str):
     }
 
 
+class PushSub(BaseModel):
+    share_token: str
+    subscription: dict
+
+
+@api_router.get("/push/vapid-public-key")
+async def vapid_public():
+    _, pub = await get_vapid()
+    return {"key": pub}
+
+
+@api_router.post("/push/subscribe")
+async def push_subscribe(payload: PushSub):
+    me = await db.members.find_one({"share_token": payload.share_token}, {"id": 1})
+    if not me:
+        raise HTTPException(status_code=404, detail="Member not found")
+    endpoint = payload.subscription.get("endpoint")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Invalid subscription")
+    await db.push_subs.update_one(
+        {"endpoint": endpoint},
+        {"$set": {"member_id": me["id"], "subscription": payload.subscription,
+                  "endpoint": endpoint, "created_at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api_router.get("/tartans/{token}/teams")
+async def team_scoreboard(token: str):
+    t = await db.tartans.find_one({"token": token})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    pipeline = [
+        {"$match": {"tartan_id": token, "team": {"$ne": None}}},
+        {"$group": {"_id": "$team", "members": {"$sum": 1},
+                    "verified": {"$sum": {"$cond": ["$verified", 1, 0]}},
+                    "reach": {"$sum": "$downstream_count"}}},
+        {"$sort": {"reach": -1, "members": -1}},
+    ]
+    rows = await db.members.aggregate(pipeline).to_list(50)
+    return {
+        "teams": t.get("teams") or [],
+        "scoreboard": [{"team": r["_id"], "members": r["members"], "verified": r["verified"], "reach": r["reach"]} for r in rows],
+    }
+
+
 @api_router.post("/reports")
 async def create_report(payload: ReportCreate, request: Request, response: Response):
     device = get_or_issue_device(request, response)
@@ -898,6 +1030,8 @@ async def on_startup():
     await db.members.create_index("parent_share_token")
     await db.members.create_index("parent_id")
     await db.notifications.create_index("member_id")
+    await db.push_subs.create_index("member_id")
+    await db.push_subs.create_index("endpoint")
     await db.tartans.create_index("token")
     try:
         init_storage()

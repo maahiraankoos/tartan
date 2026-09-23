@@ -168,6 +168,7 @@ export default function InviteLanding() {
         loading={joining}
         inviterName={inviter.nickname}
         inviterAvatar={mediaUrl(inviter.avatar_url)}
+        teams={tartan?.teams}
       />
 
       <JoinReveal

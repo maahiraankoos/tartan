@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { Avatar } from "@/components/Avatar";
 import { ChainSigil } from "@/components/ChainSigil";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { OGBadge, VerifiedBadge } from "@/components/Badges";
+import { OGBadge, VerifiedBadge, RewardBadge } from "@/components/Badges";
 import { useApp } from "@/context/AppContext";
 import { fmtNum, mediaUrl } from "@/lib/helpers";
 import { auraFor } from "@/lib/aura";
@@ -58,8 +58,9 @@ export default function Profile() {
                 <h1 className="font-unbounded font-black text-2xl text-white">{m.nickname}</h1>
                 {verified_organizer && m.is_initiator && <VerifiedBadge verified />}
               </div>
-              <div className="flex items-center justify-center gap-2 mt-1.5">
+              <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
                 <OGBadge sparkNumber={m.spark_number} />
+                <RewardBadge reward={m.reward} />
                 {m.is_initiator && <span className="text-[10px] uppercase tracking-widest text-amber-300">{t("founder")}</span>}
                 <span className="font-mono text-xs text-slate-400">Spark #{m.spark_number ?? "—"}</span>
               </div>

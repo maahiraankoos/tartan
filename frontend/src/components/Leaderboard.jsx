@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Trophy } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
-import { OGBadge } from "@/components/Badges";
+import { OGBadge, RewardBadge } from "@/components/Badges";
 import { useApp, getMembership } from "@/context/AppContext";
 import { fmtNum, mediaUrl } from "@/lib/helpers";
 import api from "@/lib/api";
@@ -42,6 +42,7 @@ export const Leaderboard = ({ token, refreshKey = 0 }) => {
                 <div className="flex items-center gap-1.5">
                   <span className={`font-semibold truncate ${mine ? "text-cyan-300" : "text-white"}`}>{m.nickname}</span>
                   <OGBadge sparkNumber={m.spark_number} />
+                  <RewardBadge reward={m.reward} />
                   {mine && <span className="text-[9px] uppercase text-cyan-400">{t("you")}</span>}
                 </div>
                 <div className="text-[11px] text-slate-500">{m.city}</div>

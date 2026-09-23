@@ -110,6 +110,17 @@ export const DICT = {
   has_reached: { EN: "has reached", SO: "wuxuu gaadhay" },
   be_next: { EN: "Be the next spark", SO: "Noqo kan xiga" },
   goal_people: { EN: "person goal", SO: "qof hadaf" },
+  enable_alerts: { EN: "Turn on alerts", SO: "Shid digniinaha" },
+  alerts_on: { EN: "Alerts on", SO: "Digniino waa shidan" },
+  alerts_blocked: { EN: "Alerts blocked in browser", SO: "Digniinaha waa la xannibay" },
+  pick_team: { EN: "Pick your team", SO: "Dooro kooxdaada" },
+  no_team: { EN: "No team", SO: "Koox la'aan" },
+  team_battle: { EN: "Team battle", SO: "Tartanka kooxaha" },
+  teams_field: { EN: "Teams", SO: "Kooxaha" },
+  teams_hint: { EN: "comma separated · optional", SO: "kala saar comma · ikhtiyaari" },
+  rewards: { EN: "Invite rewards", SO: "Abaalmarinta casumaadda" },
+  reward_locked: { EN: "invites to unlock", SO: "casuumaad si loo furo" },
+  reward_unlocked: { EN: "Unlocked", SO: "La furay" },
 };
 
 export function translate(lang, key) {
