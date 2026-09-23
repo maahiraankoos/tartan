@@ -3,6 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { MessageCircle, Smartphone, Share2, Copy, QrCode, Check, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useApp } from "@/context/AppContext";
+import { shareUrl } from "@/lib/helpers";
 import { toast } from "sonner";
 
 export const SharePanel = ({ shareToken, tartanTitle }) => {
@@ -10,7 +11,7 @@ export const SharePanel = ({ shareToken, tartanTitle }) => {
   const [copied, setCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
 
-  const url = `${window.location.origin}/j/${shareToken}`;
+  const url = shareUrl(shareToken);
   const msg = `${tartanTitle ? tartanTitle + " — " : ""}Join the chain and keep it moving: ${url}`;
 
   const copy = async () => {

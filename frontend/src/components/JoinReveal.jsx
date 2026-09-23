@@ -4,7 +4,9 @@ import confetti from "canvas-confetti";
 import { MessageCircle, Copy, ArrowRight, Zap, Check } from "lucide-react";
 import { ChainSigil } from "@/components/ChainSigil";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
+import { SharePosterButton } from "@/components/SharePosterButton";
 import { auraFor } from "@/lib/aura";
+import { shareUrl } from "@/lib/helpers";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 
@@ -13,7 +15,7 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
   const [stage, setStage] = useState(0);
   const [copied, setCopied] = useState(false);
   const aura = auraFor(chainSeed);
-  const url = `${window.location.origin}/j/${shareToken}`;
+  const url = shareUrl(shareToken);
   const msg = `${chainName ? chainName + " — " : ""}Join the chain and keep it moving: ${url}`;
 
   useEffect(() => {
@@ -106,17 +108,17 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
               className="mt-8 space-y-3"
             >
               <p className="text-xs text-slate-400">{isInitiator ? "Now share it. Send the first invite." : "Now share your link so the chain keeps growing."}</p>
-              <a
-                data-testid="reveal-whatsapp-button"
-                href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full h-13 py-3.5 rounded-full font-display font-bold text-slate-950 flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-                style={{ background: `linear-gradient(90deg, ${aura.palette.primary}, ${aura.palette.secondary})` }}
-              >
-                <MessageCircle size={18} /> Share to WhatsApp
-              </a>
+              <SharePosterButton shareToken={shareToken} reach={0} tartanTitle={chainName} variant="hero" />
               <div className="flex gap-2">
+                <a
+                  data-testid="reveal-whatsapp-button"
+                  href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 h-12 rounded-full font-semibold text-emerald-300 border border-emerald-500/40 flex items-center justify-center gap-2 hover:bg-emerald-500/10 active:scale-[0.97] transition-all"
+                >
+                  <MessageCircle size={16} /> WhatsApp
+                </a>
                 <button
                   data-testid="reveal-copy-button"
                   onClick={copy}
@@ -124,14 +126,14 @@ export const JoinReveal = ({ open, sparkNumber, chainName, chainSeed, city, shar
                 >
                   {copied ? <Check size={16} /> : <Copy size={16} />} {t("copy_link")}
                 </button>
-                <button
-                  data-testid="reveal-continue-button"
-                  onClick={onContinue}
-                  className="flex-1 h-12 rounded-full font-semibold text-slate-300 border border-slate-700 flex items-center justify-center gap-2 hover:border-slate-500 active:scale-[0.97] transition-all"
-                >
-                  My branch <ArrowRight size={16} />
-                </button>
               </div>
+              <button
+                data-testid="reveal-continue-button"
+                onClick={onContinue}
+                className="w-full h-11 rounded-full font-semibold text-slate-300 border border-slate-700 flex items-center justify-center gap-2 hover:border-slate-500 active:scale-[0.97] transition-all"
+              >
+                My branch <ArrowRight size={16} />
+              </button>
             </motion.div>
           </div>
         </motion.div>

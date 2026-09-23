@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Share2, Download, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { auraFor, polyPoints } from "@/lib/aura";
-import { fmtNum } from "@/lib/helpers";
+import { fmtNum, shareUrl } from "@/lib/helpers";
 import { toast } from "sonner";
 
 export const RipplePoster = ({ chain, shareToken }) => {
@@ -19,7 +19,7 @@ export const RipplePoster = ({ chain, shareToken }) => {
   const tartan = chain?.tartan || {};
   const directs = (chain?.directs || []).slice(0, 12);
   const aura = auraFor(tartan.token || shareToken || "tartan");
-  const url = `${window.location.origin}/j/${shareToken}`;
+  const url = shareUrl(shareToken);
   const initial = (n) => (n || "?").trim().charAt(0).toUpperCase();
 
   const generate = async () => {

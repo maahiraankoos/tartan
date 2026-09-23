@@ -8,6 +8,7 @@ import { ReportDialog } from "@/components/ReportDialog";
 import { MilestoneCard } from "@/components/MilestoneCard";
 import { PersonalRipple } from "@/components/PersonalRipple";
 import { RipplePoster } from "@/components/RipplePoster";
+import { SharePosterButton } from "@/components/SharePosterButton";
 import { NotificationsFeed } from "@/components/NotificationsFeed";
 import { PushButton } from "@/components/PushButton";
 import { StreakBadge, OGBadge, RewardBadge, RewardStrip } from "@/components/Badges";
@@ -202,6 +203,10 @@ export default function MeDashboard() {
             </div>
           </div>
         )}
+
+        <div className="mt-5">
+          <SharePosterButton shareToken={shareToken} reach={me.downstream_count || 0} tartanTitle={tartan?.title} variant="hero" />
+        </div>
 
         <NotificationsFeed shareToken={shareToken} refreshKey={dc} />
 

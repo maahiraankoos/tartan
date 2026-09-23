@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Header, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -16,6 +16,7 @@ import asyncio
 import requests
 import bcrypt
 import jwt
+import html as html_lib
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Annotated, Any
@@ -332,6 +333,9 @@ CATEGORIES = [
      "example": "The 7-day kindness challenge"},
 ]
 CATEGORY_IDS = {c["id"] for c in CATEGORIES}
+CATEGORY_LABEL = {c["id"]: c["label"] for c in CATEGORIES}
+
+from og_card import render_card, palette_for
 
 
 # ---------------------------------------------------------------------------
@@ -614,6 +618,83 @@ async def get_share_context(share_token: str):
         "tartan": tartan_public(t),
         "stats": stats,
     }
+
+
+@api_router.get("/og/{token}.png")
+async def og_image(token: str):
+    m = await db.members.find_one({"share_token": token}, {"_id": 0})
+    if not m:
+        raise HTTPException(status_code=404, detail="Not found")
+    t = await db.tartans.find_one({"token": m["tartan_id"]}, {"_id": 0})
+    rank, total, pct = await member_rank(m["tartan_id"], m.get("downstream_count", 0))
+    directs = await db.members.find({"parent_share_token": token}, {"nickname": 1}).limit(8).to_list(8)
+    initials = [(d.get("nickname") or "?").strip()[:1].upper() for d in directs]
+    primary, secondary = palette_for((t or {}).get("token") or token)
+    data = {
+        "nickname": m.get("nickname"),
+        "reach": m.get("downstream_count", 0),
+        "spark_number": m.get("spark_number"),
+        "rank": rank,
+        "percentile": pct,
+        "title": (t or {}).get("title") or "Tartan chain",
+        "category_label": CATEGORY_LABEL.get((t or {}).get("category")),
+        "primary": primary,
+        "secondary": secondary,
+    }
+    png = await asyncio.to_thread(render_card, data, initials)
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=300"})
+
+
+def _public_base(request: Request) -> str:
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or "localhost"
+    scheme = request.headers.get("x-forwarded-proto", "https")
+    return f"{scheme}://{host}"
+
+
+@api_router.get("/s/{token}")
+async def share_landing(token: str, request: Request):
+    """HTML wrapper that unfurls into the share card, then bounces real
+    browsers into the SPA invite page."""
+    m = await db.members.find_one({"share_token": token}, {"_id": 0})
+    base = _public_base(request)
+    app_url = f"/j/{token}"
+    if not m:
+        title, desc, image = "Tartan — the living human chain", "Join a chain and watch one idea travel person to person.", f"{base}/api/og/none.png"
+    else:
+        t = await db.tartans.find_one({"token": m["tartan_id"]}, {"_id": 0})
+        nick = m.get("nickname") or "Someone"
+        reach = m.get("downstream_count", 0)
+        ttitle = (t or {}).get("title") or "a Tartan chain"
+        title = f"{nick} invited you to a Tartan"
+        desc = f"{nick}'s chain has reached {reach:,} people. Tap to join \u201c{ttitle}\u201d and keep it moving."
+        image = f"{base}/api/og/{token}.png"
+    e = html_lib.escape
+    html_doc = f"""<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{e(title)}</title>
+<meta name="description" content="{e(desc)}"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Tartan"/>
+<meta property="og:title" content="{e(title)}"/>
+<meta property="og:description" content="{e(desc)}"/>
+<meta property="og:image" content="{e(image)}"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:url" content="{e(base + '/api/s/' + token)}"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="{e(title)}"/>
+<meta name="twitter:description" content="{e(desc)}"/>
+<meta name="twitter:image" content="{e(image)}"/>
+<meta http-equiv="refresh" content="0; url={e(app_url)}"/>
+<style>html,body{{margin:0;height:100%;background:#070B14;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center}}.d{{text-align:center}}.p{{width:34px;height:34px;border:3px solid rgba(0,240,255,.25);border-top-color:#00F0FF;border-radius:50%;margin:0 auto 14px;animation:s .8s linear infinite}}@keyframes s{{to{{transform:rotate(360deg)}}}}a{{color:#00F0FF}}</style>
+</head><body>
+<div class="d"><div class="p"></div>Opening Tartan… <br/><a href="{e(app_url)}">Continue</a></div>
+<script>window.location.replace({app_url!r});</script>
+</body></html>"""
+    return HTMLResponse(content=html_doc, headers={"Cache-Control": "public, max-age=60"})
 
 
 @api_router.post("/tartans/{token}/join")
