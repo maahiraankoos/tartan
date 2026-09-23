@@ -118,11 +118,11 @@ export default function Admin() {
               <div className="mt-6 rounded-2xl border border-slate-700/60 bg-[#0E1526] p-5">
                 <div className="text-sm font-semibold text-white mb-3">Chains by category</div>
                 <div className="space-y-2">
-                  {overview.by_category.map((c) => {
+                  {overview.by_category.map((c, i) => {
                     const meta = CATEGORY_MAP[c.category];
                     const max = Math.max(...overview.by_category.map((x) => x.count), 1);
                     return (
-                      <div key={c.category} className="flex items-center gap-3">
+                      <div key={`${c.category}-${i}`} className="flex items-center gap-3">
                         <div className="w-40 text-sm text-slate-300 truncate">{meta ? `${meta.emoji} ${meta.label}` : c.category}</div>
                         <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
                           <div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400" style={{ width: `${(c.count / max) * 100}%` }} />

@@ -1215,16 +1215,23 @@ async def admin_overview(request: Request):
     companies = await db.users.count_documents({"role": "company"})
     creators = await db.users.count_documents({"role": "creator"})
     reports = await db.reports.count_documents({})
-    by_cat = await db.tartans.aggregate([
+    by_cat_raw = await db.tartans.aggregate([
         {"$group": {"_id": "$category", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
     ]).to_list(50)
+    merged: dict = defaultdict(int)
+    for c in by_cat_raw:
+        key = c["_id"] if c["_id"] in CATEGORY_IDS else "other"
+        merged[key] += c["count"]
+    by_cat = sorted(
+        [{"category": k, "count": v} for k, v in merged.items()],
+        key=lambda x: -x["count"],
+    )
     return {
         "tartans": total_tartans, "hidden": hidden, "featured": featured,
         "feature_requests": feature_reqs, "members": total_members,
         "verified_members": verified_members, "users": total_users,
         "companies": companies, "creators": creators, "reports": reports,
-        "by_category": [{"category": c["_id"] or "other", "count": c["count"]} for c in by_cat],
+        "by_category": by_cat,
     }
 
 
