@@ -45,9 +45,10 @@ A shareable, no-download human referral chain (mobile-first PWA). People start o
 - ✅ Tested: 19/19 backend pytest + 100% frontend critical flows (iteration_7).
 
 ## Roadmap
-- **Phase 2 — Monetization**: online payments for Featured placement (user chose offline for now; revisit Stripe when ready); Creator Pro / Company sponsored-chain tiers.
-- **Paused team features** (requested earlier, deferred for this platform work): Team Join Reveal (team color + rank in celebration), Team Invites (captain link auto-assigns team), Daily Push Digest (evening summary, needs a scheduler).
-- P2: split server.py into modules (auth/admin/tartans); SSE multi-worker via Redis; passkey for initiators.
+- **Phase 2 — Monetization** ✅ (2026-06): Offline-payment **Featured Placement**. Plans $19/7d & $49/30d (`GET /api/feature-plans`). Creator submits a feature order from Studio (`POST /api/tartans/{token}/feature-order`, owner-guarded, 409 on duplicate pending); admin reviews in the Orders tab and **Mark paid & activate** (`/api/admin/orders/{id}/activate`) sets `featured` + `featured_until`, or **Reject**. Lazy **auto-expiry** un-features chains past `featured_until` (manual features like Puntland with no `featured_until` are preserved). Admin Overview shows Revenue + Pending orders. Tested 12/12 backend + frontend (iteration_8).
+- **Phase 3 candidates**: online payments (Stripe) for self-serve instant featuring; Creator Pro / Company sponsored-chain tiers.
+- **Paused team features**: Team Join Reveal, Team Invites (captain link auto-assigns team), Daily Push Digest (needs a scheduler).
+- P2: split server.py (~1600 lines) into modules (auth/admin/tartans/orders); throttle the expire_featured sweep; SSE multi-worker via Redis.
 
 ## Backlog (prioritized)
 - P1: Hide initiator_share_token from public list response

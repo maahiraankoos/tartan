@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 2 (offline-payment featured-placement) tested end-to-end. 12/12 backend pytest tests pass covering feature-plans, order create with ownership/duplicate/plan guards, my/orders, admin orders list/activate/reject, overview revenue+pending stats, and auto-expiry sweep (expired chain un-featured while puntland with no featured_until stays featured). Frontend flows verified: creator opens Feature Checkout dialog from /studio, selects 30d plan, submits, sees success screen, and card shows 'Feature pending review'. Admin /admin -> Orders tab shows the pending order with 'Mark paid & activate' + 'Reject' buttons; activation flashes 'Order activated — chain is now featured' toast and moves it to ACTIVE with expiry date. Admin Overview now shows Revenue ($269) and Pending Orders stat cards. Home page renders FEATURED section with the flagship Puntland chain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/tartans", "issue": "tartan_public() does `t[\"initiator_share_token\"]` without .get(), so any tartan doc missing that field crashes the endpoint with 500. Not reachable via normal creation flow (which sets it), but any admin/dev data insertion missing that key breaks the public list. Recommend `t.get(\"initiator_share_token\")`."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2_orders.py",
+    "/app/test_reports/pytest/phase2_results.xml"
+  ],
+  "action_items": [
+    "(Optional / defensive) In backend/server.py tartan_public() use t.get('initiator_share_token') to avoid 500s if any tartan doc lacks the field.",
+    "(Optional) FeatureCheckout modal 'Done' button carries data-testid='feature-checkout-close' but shadcn Dialog's outer X close is not testid-attributed; both work — no action strictly required."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1610 lines. It is well past the 700-line guideline; strongly recommend splitting into modules (auth, admin, tartans, orders, categories) — orders feature is a clean seam.",
+    "expire_featured() runs as a lazy sweep in list_tartans / my_tartans / admin_overview / admin_tartans on every hit. That is fine at current scale but incurs a repeated write-check on hot GET paths — consider a small in-memory throttle (e.g. run at most once per 30s) or a background task.",
+    "expire_featured() query correctly excludes docs where featured_until is null/missing, so the manually-featured 'puntland' record stays featured — verified in tests.",
+    "POST /api/tartans/{token}/feature-order stores the order and updates tartan.feature_requested=True even before admin activation; if admin rejects, feature_requested is cleared. Consistent, but the tartan doc now has two states ('feature_requested' from Phase 1 UI + 'pending order') that both mean 'pending'. Consider consolidating.",
+    "order_public leaks 'owner_user_id' — fine for admin but exposed via GET /api/my/orders too. Not sensitive since it's the caller's own id, but consider omitting on the /my endpoint for consistency."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2_orders.py (new)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% of Phase 2 critical flows"},
+  "test_credentials": "Admin admin@tartan.app / TartanAdmin2026! works. Test creators generated per run as TEST_creator_*@tartan.test / CreatorPass123!.",
+  "seed_data_creation": "Each test run creates TEST_* creator accounts and TEST_* tartans (Phase2 Chain, Reject Chain, Unknown Plan Chain, Other Chain, Expired Chain). AutoExpiry test inserts a mongo doc with initiator_share_token so GET /api/tartans stays healthy; also inserts a matching 'active' order with past expires_at. Not auto-cleaned. Also had to restore puntland to featured=True with featured_until unset (previous iteration test data had left it unfeatured).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 2 endpoints: GET /api/feature-plans (public), POST /api/tartans/{token}/feature-order (auth+owner; 403 non-owner, 409 dup pending, 400 bad plan), GET /api/my/orders, GET /api/admin/orders?status=, POST /api/admin/orders/{id}/activate (400 if not pending), POST /api/admin/orders/{id}/reject. Response envelope on create: {order: {...}}. Frontend testids: feature-checkout-open-{token}, feature-checkout-modal, feature-plan-7d, feature-plan-30d, feature-checkout-submit, feature-checkout-success, feature-checkout-close. Admin: admin-tab-orders, admin-order-activate-{id}, admin-order-reject-{id}. If puntland ever loses featured status again, restore with: db.tartans.update_one({token:'puntland'},{'$set':{'featured':True},'$unset':{'featured_until':''}}). Run tests with: cd /app && python -m pytest backend/tests/test_phase2_orders.py -v -o addopts=''",
+  "rca_of_the_issue": "N/A — no functional Phase 2 bugs found. One defensive issue: tartan_public does a bracket-key access on initiator_share_token which will 500 if any doc omits it (reproducible only by direct DB writes). Auto-expiry sweep correctly preserves puntland (no featured_until) while un-featuring paid chains whose featured_until is in the past."
+}

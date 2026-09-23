@@ -416,7 +416,7 @@ def tartan_public(t: dict) -> dict:
         "title": t["title"],
         "goal": t["goal"],
         "city": t.get("city") or "Remote",
-        "initiator_share_token": t["initiator_share_token"],
+        "initiator_share_token": t.get("initiator_share_token"),
         "initiator_nickname": t.get("initiator_nickname"),
         "featured": t.get("featured", False),
         "featured_until": t.get("featured_until"),
