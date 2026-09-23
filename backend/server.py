@@ -419,6 +419,7 @@ def tartan_public(t: dict) -> dict:
         "initiator_share_token": t["initiator_share_token"],
         "initiator_nickname": t.get("initiator_nickname"),
         "featured": t.get("featured", False),
+        "featured_until": t.get("featured_until"),
         "total_members": t.get("total_members", 0),
         "verified_members": t.get("verified_members", 0),
         "max_depth": t.get("max_depth", 0),
@@ -473,6 +474,7 @@ async def root():
 
 @api_router.get("/tartans")
 async def list_tartans(category: Optional[str] = Query(None)):
+    await expire_featured()
     q: dict = {"hidden": {"$ne": True}}
     if category and category in CATEGORY_IDS:
         q["category"] = category
@@ -1182,6 +1184,7 @@ async def auth_refresh(request: Request, response: Response):
 @api_router.get("/my/tartans")
 async def my_tartans(request: Request):
     u = await require_user(request)
+    await expire_featured()
     docs = await db.tartans.find({"owner_user_id": u["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return [tartan_public(d) for d in docs]
 
@@ -1199,16 +1202,117 @@ async def request_feature(token: str, request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Featured placement (offline payment) — plans, orders, auto-expiry
+# ---------------------------------------------------------------------------
+
+FEATURE_PLANS = [
+    {"id": "7d", "label": "7 days", "days": 7, "price": 19, "currency": "USD",
+     "blurb": "A week on the home page & top of your category."},
+    {"id": "30d", "label": "30 days", "days": 30, "price": 49, "currency": "USD",
+     "blurb": "A full month of prime visibility — best value.", "best_value": True},
+]
+PLAN_MAP = {p["id"]: p for p in FEATURE_PLANS}
+
+
+class FeatureOrderCreate(BaseModel):
+    plan: str
+
+
+def order_public(o: dict) -> dict:
+    return {
+        "id": o["id"],
+        "tartan_token": o["tartan_token"],
+        "tartan_title": o.get("tartan_title"),
+        "plan": o["plan"],
+        "days": o.get("days"),
+        "amount": o.get("amount"),
+        "currency": o.get("currency", "USD"),
+        "status": o.get("status"),
+        "owner_name": o.get("owner_name"),
+        "owner_user_id": o.get("owner_user_id"),
+        "created_at": o.get("created_at"),
+        "activated_at": o.get("activated_at"),
+        "expires_at": o.get("expires_at"),
+    }
+
+
+async def expire_featured():
+    now = now_iso()
+    expired = await db.tartans.find(
+        {"featured": True, "featured_until": {"$exists": True, "$ne": None, "$lt": now}},
+        {"token": 1},
+    ).to_list(500)
+    for t in expired:
+        await db.tartans.update_one({"token": t["token"]}, {"$set": {"featured": False}})
+        await db.orders.update_many(
+            {"tartan_token": t["token"], "status": "active"}, {"$set": {"status": "expired"}}
+        )
+
+
+@api_router.get("/feature-plans")
+async def feature_plans():
+    return FEATURE_PLANS
+
+
+@api_router.post("/tartans/{token}/feature-order")
+async def create_feature_order(token: str, payload: FeatureOrderCreate, request: Request):
+    u = await require_user(request)
+    plan = PLAN_MAP.get(payload.plan)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Unknown plan")
+    t = await db.tartans.find_one({"token": token})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    if t.get("owner_user_id") != u["id"]:
+        raise HTTPException(status_code=403, detail="Only the owner can feature this chain")
+    existing = await db.orders.find_one({"tartan_token": token, "status": "pending"})
+    if existing:
+        raise HTTPException(status_code=409, detail="You already have a pending order for this chain")
+    order = {
+        "id": secrets.token_hex(12),
+        "tartan_token": token,
+        "tartan_title": t.get("title"),
+        "owner_user_id": u["id"],
+        "owner_name": u.get("org_name") or u.get("name") or u.get("email"),
+        "plan": plan["id"],
+        "days": plan["days"],
+        "amount": plan["price"],
+        "currency": plan["currency"],
+        "status": "pending",
+        "created_at": now_iso(),
+        "activated_at": None,
+        "expires_at": None,
+    }
+    await db.orders.insert_one(dict(order))
+    await db.tartans.update_one({"token": token}, {"$set": {"feature_requested": True, "feature_requested_at": now_iso()}})
+    return {"order": order_public(order)}
+
+
+@api_router.get("/my/orders")
+async def my_orders(request: Request):
+    u = await require_user(request)
+    docs = await db.orders.find({"owner_user_id": u["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return [order_public(o) for o in docs]
+
+
+# ---------------------------------------------------------------------------
 # Admin endpoints
 # ---------------------------------------------------------------------------
 
 @api_router.get("/admin/overview")
 async def admin_overview(request: Request):
     await require_admin(request)
+    await expire_featured()
     total_tartans = await db.tartans.count_documents({})
     hidden = await db.tartans.count_documents({"hidden": True})
     featured = await db.tartans.count_documents({"featured": True})
     feature_reqs = await db.tartans.count_documents({"feature_requested": True, "featured": {"$ne": True}})
+    pending_orders = await db.orders.count_documents({"status": "pending"})
+    revenue = await db.orders.aggregate([
+        {"$match": {"status": {"$in": ["active", "expired"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]).to_list(1)
+    total_revenue = revenue[0]["total"] if revenue else 0
     total_members = await db.members.count_documents({})
     verified_members = await db.members.count_documents({"verified": True})
     total_users = await db.users.count_documents({})
@@ -1228,7 +1332,8 @@ async def admin_overview(request: Request):
     )
     return {
         "tartans": total_tartans, "hidden": hidden, "featured": featured,
-        "feature_requests": feature_reqs, "members": total_members,
+        "feature_requests": feature_reqs, "pending_orders": pending_orders,
+        "revenue": total_revenue, "members": total_members,
         "verified_members": verified_members, "users": total_users,
         "companies": companies, "creators": creators, "reports": reports,
         "by_category": by_cat,
@@ -1238,6 +1343,7 @@ async def admin_overview(request: Request):
 @api_router.get("/admin/tartans")
 async def admin_tartans(request: Request, q: Optional[str] = Query(None), filter: Optional[str] = Query(None)):
     await require_admin(request)
+    await expire_featured()
     query: dict = {}
     if filter == "featured":
         query["featured"] = True
@@ -1290,6 +1396,48 @@ async def admin_reports(request: Request):
     await require_admin(request)
     docs = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(300)
     return docs
+
+
+@api_router.get("/admin/orders")
+async def admin_orders(request: Request, status: Optional[str] = Query(None)):
+    await require_admin(request)
+    await expire_featured()
+    q: dict = {}
+    if status:
+        q["status"] = status
+    docs = await db.orders.find(q, {"_id": 0}).sort([("status", 1), ("created_at", -1)]).to_list(500)
+    return [order_public(o) for o in docs]
+
+
+@api_router.post("/admin/orders/{order_id}/activate")
+async def admin_activate_order(order_id: str, request: Request):
+    await require_admin(request)
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if o["status"] not in ("pending",):
+        raise HTTPException(status_code=400, detail="Order is not pending")
+    days = o.get("days", 7)
+    activated = datetime.now(timezone.utc)
+    expires = (activated + timedelta(days=days)).isoformat()
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "status": "active", "activated_at": activated.isoformat(), "expires_at": expires,
+    }})
+    await db.tartans.update_one({"token": o["tartan_token"]}, {"$set": {
+        "featured": True, "featured_until": expires, "feature_requested": False,
+    }})
+    return {"ok": True, "expires_at": expires}
+
+
+@api_router.post("/admin/orders/{order_id}/reject")
+async def admin_reject_order(order_id: str, request: Request):
+    await require_admin(request)
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Order not found")
+    await db.orders.update_one({"id": order_id}, {"$set": {"status": "rejected"}})
+    await db.tartans.update_one({"token": o["tartan_token"]}, {"$set": {"feature_requested": False}})
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1427,6 +1575,9 @@ async def on_startup():
     await db.tartans.create_index("category")
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.orders.create_index("owner_user_id")
+    await db.orders.create_index("tartan_token")
+    await db.orders.create_index("status")
     try:
         init_storage()
         logger.info("Storage initialized")

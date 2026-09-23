@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Loader2, BarChart3, ArrowRight, Users, Sparkles, Star, Flame, Plus } from "lucide-react";
 import { Header } from "@/components/Header";
 import { StartTartanDialog } from "@/components/StartTartanDialog";
+import { FeatureCheckout } from "@/components/FeatureCheckout";
 import { ChainSigil } from "@/components/ChainSigil";
 import { CATEGORY_MAP } from "@/lib/categories";
 import { useAuth } from "@/context/AuthContext";
@@ -35,6 +36,7 @@ export default function Studio() {
       toast.error(e?.response?.data?.detail || "Could not send request");
     }
   };
+
 
   if (!user || tartans === null) {
     return (
@@ -105,14 +107,13 @@ export default function Studio() {
                         Manage <ArrowRight size={13} />
                       </Link>
                       {tt.featured ? (
-                        <span className="ml-auto text-[11px] text-amber-400 font-semibold">★ Live on home</span>
+                        <span className="ml-auto text-[11px] text-amber-400 font-semibold" data-testid={`studio-featured-${tt.token}`}>
+                          ★ Featured{tt.featured_until ? ` · until ${new Date(tt.featured_until).toLocaleDateString()}` : ""}
+                        </span>
                       ) : tt.feature_requested ? (
                         <span className="ml-auto text-[11px] text-amber-300/70">Feature pending review</span>
                       ) : (
-                        <button data-testid={`studio-feature-${tt.token}`} onClick={() => requestFeature(tt.token)}
-                          className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-amber-300 hover:text-amber-200">
-                          <Star size={12} /> Get featured
-                        </button>
+                        <div className="ml-auto"><FeatureCheckout tartan={tt} onDone={load} /></div>
                       )}
                     </div>
                   </div>

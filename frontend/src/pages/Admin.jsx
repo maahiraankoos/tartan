@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Shield, Star, EyeOff, Eye, Users, Flag, LayoutGrid, Search } from "lucide-react";
+import { Loader2, Shield, Star, EyeOff, Eye, Users, Flag, LayoutGrid, Search, Receipt, Check, X } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { CATEGORY_MAP } from "@/lib/categories";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
+  { id: "orders", label: "Orders", icon: Receipt },
   { id: "chains", label: "Chains", icon: Star },
   { id: "users", label: "Users", icon: Users },
   { id: "reports", label: "Reports", icon: Flag },
@@ -19,7 +20,7 @@ const TABS = [
 const StatCard = ({ label, value, accent }) => (
   <div className="rounded-2xl border border-slate-700/60 bg-[#0E1526] p-4">
     <div className="text-[10px] uppercase tracking-widest text-slate-400">{label}</div>
-    <div className="font-unbounded text-3xl font-black mt-1" style={{ color: accent || "#fff" }}>{fmtNum(value)}</div>
+    <div className="font-unbounded text-3xl font-black mt-1" style={{ color: accent || "#fff" }}>{typeof value === "number" ? fmtNum(value) : value}</div>
   </div>
 );
 
@@ -31,6 +32,7 @@ export default function Admin() {
   const [chains, setChains] = useState(null);
   const [users, setUsers] = useState(null);
   const [reports, setReports] = useState(null);
+  const [orders, setOrders] = useState(null);
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
 
@@ -52,6 +54,20 @@ export default function Admin() {
   useEffect(() => { if (user?.role === "admin" && tab === "chains") loadChains(); }, [user, tab, loadChains]);
   useEffect(() => { if (user?.role === "admin" && tab === "users" && !users) api.get("/admin/users").then(({ data }) => setUsers(data)).catch(() => setUsers([])); }, [user, tab, users]);
   useEffect(() => { if (user?.role === "admin" && tab === "reports" && !reports) api.get("/admin/reports").then(({ data }) => setReports(data)).catch(() => setReports([])); }, [user, tab, reports]);
+
+  const loadOrders = useCallback(() => {
+    api.get("/admin/orders").then(({ data }) => setOrders(data)).catch(() => setOrders([]));
+  }, []);
+  useEffect(() => { if (user?.role === "admin" && tab === "orders") loadOrders(); }, [user, tab, loadOrders]);
+
+  const activateOrder = async (id) => {
+    try { await api.post(`/admin/orders/${id}/activate`); toast.success("Order activated — chain is now featured"); loadOrders(); loadOverview(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Action failed"); }
+  };
+  const rejectOrder = async (id) => {
+    try { await api.post(`/admin/orders/${id}/reject`); toast.success("Order rejected"); loadOrders(); loadOverview(); }
+    catch (e) { toast.error("Action failed"); }
+  };
 
   const toggleFeature = async (tt) => {
     try {
@@ -106,13 +122,13 @@ export default function Admin() {
           overview ? (
             <div data-testid="admin-overview">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatCard label="Revenue" value={`$${overview.revenue || 0}`} accent="#34D399" />
+                <StatCard label="Pending orders" value={overview.pending_orders || 0} accent="#FBBF24" />
                 <StatCard label="Chains" value={overview.tartans} accent="#00F0FF" />
                 <StatCard label="People reached" value={overview.members} accent="#34D399" />
                 <StatCard label="Accounts" value={overview.users} />
                 <StatCard label="Companies" value={overview.companies} accent="#A78BFA" />
                 <StatCard label="Featured" value={overview.featured} accent="#FBBF24" />
-                <StatCard label="Feature requests" value={overview.feature_requests} accent="#FBBF24" />
-                <StatCard label="Hidden" value={overview.hidden} accent="#F87171" />
                 <StatCard label="Reports" value={overview.reports} accent="#F87171" />
               </div>
               <div className="mt-6 rounded-2xl border border-slate-700/60 bg-[#0E1526] p-5">
@@ -135,6 +151,49 @@ export default function Admin() {
               </div>
             </div>
           ) : <Loader2 className="animate-spin text-cyan-400 mx-auto mt-10" size={26} />
+        )}
+
+        {tab === "orders" && (
+          orders === null ? <Loader2 className="animate-spin text-cyan-400 mx-auto mt-10" size={26} /> : orders.length === 0 ? (
+            <p className="text-slate-500 text-center py-10" data-testid="admin-orders-empty">No featured orders yet.</p>
+          ) : (
+            <div className="space-y-2" data-testid="admin-orders">
+              {orders.map((o) => {
+                const badge = {
+                  pending: "text-amber-300 border-amber-500/40",
+                  active: "text-emerald-300 border-emerald-500/40",
+                  expired: "text-slate-400 border-slate-600",
+                  rejected: "text-rose-300 border-rose-500/40",
+                }[o.status] || "text-slate-400 border-slate-600";
+                return (
+                  <div key={o.id} data-testid={`admin-order-${o.id}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-700/60 bg-[#0E1526] p-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white truncate">{o.tartan_title || o.tartan_token}</span>
+                        <span className={`text-[10px] uppercase tracking-widest rounded-full px-2 py-0.5 border ${badge}`}>{o.status}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 truncate">
+                        {o.days}-day plan · <span className="text-amber-300 font-mono">${o.amount}</span> · {o.owner_name || "—"}
+                        {o.expires_at ? ` · expires ${new Date(o.expires_at).toLocaleDateString()}` : ""}
+                      </div>
+                    </div>
+                    {o.status === "pending" && (
+                      <div className="flex items-center gap-2">
+                        <button data-testid={`admin-order-activate-${o.id}`} onClick={() => activateOrder(o.id)}
+                          className="flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25">
+                          <Check size={12} /> Mark paid & activate
+                        </button>
+                        <button data-testid={`admin-order-reject-${o.id}`} onClick={() => rejectOrder(o.id)}
+                          className="flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1.5 text-rose-300 border border-rose-500/40 hover:bg-rose-500/10">
+                          <X size={12} /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )
         )}
 
         {tab === "chains" && (
