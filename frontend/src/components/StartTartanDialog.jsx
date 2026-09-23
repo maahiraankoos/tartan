@@ -9,6 +9,7 @@ import {
 import { Loader2, Plus, Zap } from "lucide-react";
 import { useApp, saveMembership } from "@/context/AppContext";
 import { CITIES } from "@/lib/cities";
+import { CATEGORIES, CATEGORY_MAP } from "@/lib/categories";
 import { ChainSigil } from "@/components/ChainSigil";
 import { JoinReveal } from "@/components/JoinReveal";
 import { auraFor } from "@/lib/aura";
@@ -16,7 +17,7 @@ import api from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-export const StartTartanDialog = ({ trigger }) => {
+export const StartTartanDialog = ({ trigger, onCreated }) => {
   const { t } = useApp();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -27,10 +28,13 @@ export const StartTartanDialog = ({ trigger }) => {
   const [nickname, setNickname] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [teams, setTeams] = useState("");
+  const [category, setCategory] = useState("reconnect");
+  const [target, setTarget] = useState("");
   const [reveal, setReveal] = useState(null);
 
   const seed = title.trim() || "your new chain";
   const aura = auraFor(seed);
+  const catMeta = CATEGORY_MAP[category];
 
   const submit = async (e) => {
     e.preventDefault();
@@ -41,9 +45,11 @@ export const StartTartanDialog = ({ trigger }) => {
         title: title.trim(), goal: goal.trim(), city: city || null, nickname: nickname.trim(),
         goal_target: goalTarget ? parseInt(goalTarget, 10) : null,
         teams: teams ? teams.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6) : null,
+        category, target: target.trim() || null,
       });
       saveMembership(data.tartan.token, data.member.share_token);
       setOpen(false);
+      if (onCreated) onCreated();
       setReveal({
         sparkNumber: data.member.spark_number || 1,
         chainName: data.tartan.title,
@@ -71,7 +77,7 @@ export const StartTartanDialog = ({ trigger }) => {
             </button>
           )}
         </DialogTrigger>
-        <DialogContent className="glass border-cyan-500/30 sm:max-w-md" data-testid="start-tartan-modal">
+        <DialogContent className="glass border-cyan-500/30 sm:max-w-md max-h-[88vh] overflow-y-auto" data-testid="start-tartan-modal">
           <DialogHeader>
             <DialogTitle className="font-unbounded text-2xl text-white">{t("start_tartan")}</DialogTitle>
           </DialogHeader>
@@ -91,8 +97,30 @@ export const StartTartanDialog = ({ trigger }) => {
 
           <form onSubmit={submit} className="space-y-4 pt-1">
             <div className="space-y-1.5">
+              <Label className="text-slate-300 text-xs">What kind of chain is this?</Label>
+              <div className="grid grid-cols-3 gap-1.5" data-testid="category-picker">
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    data-testid={`category-option-${c.id}`}
+                    onClick={() => setCategory(c.id)}
+                    className={`rounded-xl border p-2 text-center transition-all ${category === c.id ? "border-cyan-400 bg-cyan-500/10" : "border-slate-700 bg-slate-900/40 hover:border-slate-600"}`}
+                  >
+                    <div className="text-lg leading-none">{c.emoji}</div>
+                    <div className={`text-[10px] mt-1 leading-tight ${category === c.id ? "text-cyan-300" : "text-slate-400"}`}>{c.label}</div>
+                  </button>
+                ))}
+              </div>
+              {catMeta && <p className="text-[11px] text-slate-500">{catMeta.blurb}</p>}
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-slate-300">{t("title")}</Label>
               <Input data-testid="tartan-title-input" maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("title_ph")} className="bg-slate-900/70 border-slate-700 text-white h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-300 text-xs">🎯 Who / what is the target? <span className="text-slate-500">(optional)</span></Label>
+              <Input data-testid="tartan-target-input" maxLength={120} value={target} onChange={(e) => setTarget(e.target.value)} placeholder={catMeta?.example || "e.g. Class of 2010, Lincoln High"} className="bg-slate-900/70 border-slate-700 text-white h-11" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-300">{t("goal")}</Label>

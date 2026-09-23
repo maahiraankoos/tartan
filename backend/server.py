@@ -14,6 +14,8 @@ import uuid
 import base64
 import asyncio
 import requests
+import bcrypt
+import jwt
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Annotated, Any
@@ -216,6 +218,123 @@ def ip_rate_ok(ip: str, limit: int = 20, window: int = 60) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Auth (JWT email/password)
+# ---------------------------------------------------------------------------
+
+JWT_ALGORITHM = "HS256"
+ACCOUNT_TYPES = {"creator", "company"}
+
+
+def get_jwt_secret() -> str:
+    return os.environ["JWT_SECRET"]
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def create_access_token(user_id: str, email: str) -> str:
+    payload = {"sub": user_id, "email": email, "type": "access",
+               "exp": datetime.now(timezone.utc) + timedelta(hours=12)}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+def create_refresh_token(user_id: str) -> str:
+    payload = {"sub": user_id, "type": "refresh",
+               "exp": datetime.now(timezone.utc) + timedelta(days=30)}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+def set_auth_cookies(response: Response, access: str, refresh: str):
+    response.set_cookie("access_token", access, httponly=True, secure=True,
+                        samesite="none", max_age=60 * 60 * 12, path="/")
+    response.set_cookie("refresh_token", refresh, httponly=True, secure=True,
+                        samesite="none", max_age=60 * 60 * 24 * 30, path="/")
+
+
+def clear_auth_cookies(response: Response):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+
+
+def user_public(u: dict) -> dict:
+    return {
+        "id": u["id"],
+        "email": u["email"],
+        "name": u.get("name"),
+        "role": u.get("role", "creator"),
+        "org_name": u.get("org_name"),
+        "created_at": u.get("created_at"),
+    }
+
+
+async def current_user_optional(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        u = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
+        return u
+    except jwt.PyJWTError:
+        return None
+
+
+async def require_user(request: Request):
+    u = await current_user_optional(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="Please sign in to continue")
+    return u
+
+
+async def require_admin(request: Request):
+    u = await require_user(request)
+    if u.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+    return u
+
+
+# ---------------------------------------------------------------------------
+# Categories
+# ---------------------------------------------------------------------------
+
+CATEGORIES = [
+    {"id": "reconnect", "label": "Reconnect", "emoji": "🎓",
+     "blurb": "Find your people again — school, college, workplace or old crew.",
+     "example": "Reconnect the Class of 2010, Lincoln High"},
+    {"id": "cause", "label": "Cause & Awareness", "emoji": "📣",
+     "blurb": "Rally people behind an idea that matters.",
+     "example": "Clean water for every village"},
+    {"id": "event", "label": "Event", "emoji": "🎉",
+     "blurb": "Spread the word and fill the room.",
+     "example": "Garowe Tech Meetup — August"},
+    {"id": "fundraiser", "label": "Fundraiser", "emoji": "💛",
+     "blurb": "Grow the chain of givers, person to person.",
+     "example": "Help rebuild the community library"},
+    {"id": "brand", "label": "Brand & Company", "emoji": "🚀",
+     "blurb": "Launch a referral wave for your product or brand.",
+     "example": "Refer friends to our new app"},
+    {"id": "challenge", "label": "Challenge", "emoji": "🔥",
+     "blurb": "Start a movement people can't help but pass on.",
+     "example": "The 7-day kindness challenge"},
+]
+CATEGORY_IDS = {c["id"] for c in CATEGORIES}
+
+
+# ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 
@@ -227,6 +346,26 @@ class TartanCreate(BaseModel):
     real_name: Optional[str] = None
     goal_target: Optional[int] = None
     teams: Optional[List[str]] = None
+    category: Optional[str] = None
+    target: Optional[str] = None
+
+
+class RegisterCreate(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+    account_type: str = "creator"
+    org_name: Optional[str] = None
+
+
+class LoginCreate(BaseModel):
+    email: str
+    password: str
+
+
+class AdminFlag(BaseModel):
+    value: bool
+
 
 
 class JoinCreate(BaseModel):
@@ -286,6 +425,12 @@ def tartan_public(t: dict) -> dict:
         "goal_target": t.get("goal_target"),
         "verified_organizer": t.get("verified_members", 0) >= 25,
         "teams": t.get("teams") or [],
+        "category": t.get("category"),
+        "target": t.get("target"),
+        "hidden": t.get("hidden", False),
+        "feature_requested": t.get("feature_requested", False),
+        "owner_user_id": t.get("owner_user_id"),
+        "owner_name": t.get("owner_name"),
         "created_at": t.get("created_at"),
     }
 
@@ -327,9 +472,22 @@ async def root():
 
 
 @api_router.get("/tartans")
-async def list_tartans():
-    docs = await db.tartans.find({}, {"_id": 0}).sort("total_members", -1).to_list(100)
+async def list_tartans(category: Optional[str] = Query(None)):
+    q: dict = {"hidden": {"$ne": True}}
+    if category and category in CATEGORY_IDS:
+        q["category"] = category
+    docs = await db.tartans.find(q, {"_id": 0}).sort([("featured", -1), ("total_members", -1)]).to_list(200)
     return [tartan_public(d) for d in docs]
+
+
+@api_router.get("/categories")
+async def list_categories():
+    counts = await db.tartans.aggregate([
+        {"$match": {"hidden": {"$ne": True}}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+    ]).to_list(100)
+    cmap = {c["_id"]: c["count"] for c in counts}
+    return [{**c, "count": cmap.get(c["id"], 0)} for c in CATEGORIES]
 
 
 @api_router.post("/tartans")
@@ -338,6 +496,8 @@ async def create_tartan(payload: TartanCreate, request: Request, response: Respo
     ip = request.client.host if request.client else "?"
     if not ip_rate_ok(ip, limit=10):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+
+    owner = await current_user_optional(request)
 
     token = make_token()
     while await db.tartans.find_one({"token": token}):
@@ -355,6 +515,12 @@ async def create_tartan(payload: TartanCreate, request: Request, response: Respo
         "initiator_share_token": initiator_share,
         "initiator_nickname": payload.nickname.strip()[:18],
         "featured": False,
+        "hidden": False,
+        "feature_requested": False,
+        "category": (payload.category if payload.category in CATEGORY_IDS else "other"),
+        "target": (payload.target or "").strip()[:120] or None,
+        "owner_user_id": owner["id"] if owner else None,
+        "owner_name": (owner.get("org_name") or owner.get("name") or owner.get("email")) if owner else None,
         "total_members": 1,
         "verified_members": 1,
         "max_depth": 0,
@@ -924,6 +1090,202 @@ async def create_report(payload: ReportCreate, request: Request, response: Respo
 
 
 # ---------------------------------------------------------------------------
+# Auth endpoints
+# ---------------------------------------------------------------------------
+
+@api_router.post("/auth/register")
+async def register(payload: RegisterCreate, response: Response):
+    email = payload.email.strip().lower()
+    if "@" not in email or len(payload.password) < 6:
+        raise HTTPException(status_code=400, detail="Enter a valid email and a password of at least 6 characters")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+    account_type = payload.account_type if payload.account_type in ACCOUNT_TYPES else "creator"
+    user = {
+        "id": secrets.token_hex(12),
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "name": (payload.name or "").strip()[:60] or None,
+        "role": account_type,
+        "org_name": (payload.org_name or "").strip()[:80] or None,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(dict(user))
+    access = create_access_token(user["id"], email)
+    refresh = create_refresh_token(user["id"])
+    set_auth_cookies(response, access, refresh)
+    return {"user": user_public(user), "token": access}
+
+
+@api_router.post("/auth/login")
+async def login(payload: LoginCreate, request: Request, response: Response):
+    email = payload.email.strip().lower()
+    ip = request.client.host if request.client else "?"
+    ident = f"{ip}:{email}"
+    rec = await db.login_attempts.find_one({"identifier": ident})
+    if rec and rec.get("count", 0) >= 5:
+        locked_until = rec.get("locked_until")
+        if locked_until and locked_until > now_iso():
+            raise HTTPException(status_code=429, detail="Too many attempts. Try again in a few minutes.")
+    u = await db.users.find_one({"email": email})
+    if not u or not verify_password(payload.password, u["password_hash"]):
+        await db.login_attempts.update_one(
+            {"identifier": ident},
+            {"$inc": {"count": 1},
+             "$set": {"locked_until": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()}},
+            upsert=True,
+        )
+        raise HTTPException(status_code=401, detail="Wrong email or password")
+    await db.login_attempts.delete_one({"identifier": ident})
+    access = create_access_token(u["id"], email)
+    refresh = create_refresh_token(u["id"])
+    set_auth_cookies(response, access, refresh)
+    return {"user": user_public(u), "token": access}
+
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    clear_auth_cookies(response)
+    return {"ok": True}
+
+
+@api_router.get("/auth/me")
+async def auth_me(request: Request):
+    u = await require_user(request)
+    return {"user": user_public(u)}
+
+
+@api_router.post("/auth/refresh")
+async def auth_refresh(request: Request, response: Response):
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token")
+        u = await db.users.find_one({"id": payload["sub"]})
+        if not u:
+            raise HTTPException(status_code=401, detail="User not found")
+        access = create_access_token(u["id"], u["email"])
+        response.set_cookie("access_token", access, httponly=True, secure=True,
+                            samesite="none", max_age=60 * 60 * 12, path="/")
+        return {"user": user_public(u), "token": access}
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+# ---------------------------------------------------------------------------
+# Creator endpoints
+# ---------------------------------------------------------------------------
+
+@api_router.get("/my/tartans")
+async def my_tartans(request: Request):
+    u = await require_user(request)
+    docs = await db.tartans.find({"owner_user_id": u["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return [tartan_public(d) for d in docs]
+
+
+@api_router.post("/tartans/{token}/feature-request")
+async def request_feature(token: str, request: Request):
+    u = await require_user(request)
+    t = await db.tartans.find_one({"token": token})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    if t.get("owner_user_id") != u["id"]:
+        raise HTTPException(status_code=403, detail="Only the owner can request featuring")
+    await db.tartans.update_one({"token": token}, {"$set": {"feature_requested": True, "feature_requested_at": now_iso()}})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin endpoints
+# ---------------------------------------------------------------------------
+
+@api_router.get("/admin/overview")
+async def admin_overview(request: Request):
+    await require_admin(request)
+    total_tartans = await db.tartans.count_documents({})
+    hidden = await db.tartans.count_documents({"hidden": True})
+    featured = await db.tartans.count_documents({"featured": True})
+    feature_reqs = await db.tartans.count_documents({"feature_requested": True, "featured": {"$ne": True}})
+    total_members = await db.members.count_documents({})
+    verified_members = await db.members.count_documents({"verified": True})
+    total_users = await db.users.count_documents({})
+    companies = await db.users.count_documents({"role": "company"})
+    creators = await db.users.count_documents({"role": "creator"})
+    reports = await db.reports.count_documents({})
+    by_cat = await db.tartans.aggregate([
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]).to_list(50)
+    return {
+        "tartans": total_tartans, "hidden": hidden, "featured": featured,
+        "feature_requests": feature_reqs, "members": total_members,
+        "verified_members": verified_members, "users": total_users,
+        "companies": companies, "creators": creators, "reports": reports,
+        "by_category": [{"category": c["_id"] or "other", "count": c["count"]} for c in by_cat],
+    }
+
+
+@api_router.get("/admin/tartans")
+async def admin_tartans(request: Request, q: Optional[str] = Query(None), filter: Optional[str] = Query(None)):
+    await require_admin(request)
+    query: dict = {}
+    if filter == "featured":
+        query["featured"] = True
+    elif filter == "hidden":
+        query["hidden"] = True
+    elif filter == "requests":
+        query["feature_requested"] = True
+    if q:
+        query["title"] = {"$regex": q, "$options": "i"}
+    docs = await db.tartans.find(query, {"_id": 0}).sort([("feature_requested", -1), ("total_members", -1)]).to_list(500)
+    return [tartan_public(d) for d in docs]
+
+
+@api_router.post("/admin/tartans/{token}/feature")
+async def admin_feature(token: str, payload: AdminFlag, request: Request):
+    await require_admin(request)
+    t = await db.tartans.find_one({"token": token})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    update = {"featured": payload.value}
+    if payload.value:
+        update["feature_requested"] = False
+    await db.tartans.update_one({"token": token}, {"$set": update})
+    return {"ok": True, "featured": payload.value}
+
+
+@api_router.post("/admin/tartans/{token}/hide")
+async def admin_hide(token: str, payload: AdminFlag, request: Request):
+    await require_admin(request)
+    t = await db.tartans.find_one({"token": token})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    await db.tartans.update_one({"token": token}, {"$set": {"hidden": payload.value}})
+    return {"ok": True, "hidden": payload.value}
+
+
+@api_router.get("/admin/users")
+async def admin_users(request: Request):
+    await require_admin(request)
+    docs = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
+    out = []
+    for u in docs:
+        u["tartans"] = await db.tartans.count_documents({"owner_user_id": u["id"]})
+        out.append(user_public(u) | {"tartans": u["tartans"]})
+    return out
+
+
+@api_router.get("/admin/reports")
+async def admin_reports(request: Request):
+    await require_admin(request)
+    docs = await db.reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(300)
+    return docs
+
+
+# ---------------------------------------------------------------------------
 # Seed flagship Tartan
 # ---------------------------------------------------------------------------
 
@@ -943,6 +1305,12 @@ async def seed_flagship():
         "initiator_share_token": initiator_share,
         "initiator_nickname": "Amina",
         "featured": True,
+        "hidden": False,
+        "feature_requested": False,
+        "category": "cause",
+        "target": "Every builder & dreamer across Puntland and the diaspora",
+        "owner_user_id": None,
+        "owner_name": None,
         "total_members": 0,
         "verified_members": 0,
         "max_depth": 0,
@@ -1023,6 +1391,21 @@ async def backfill_sparks():
                 await db.members.update_one({"id": m["id"]}, {"$set": {"spark_number": idx + 1}})
 
 
+async def seed_admin():
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@tartan.app").strip().lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    existing = await db.users.find_one({"email": admin_email})
+    if existing is None:
+        await db.users.insert_one({
+            "id": secrets.token_hex(12), "email": admin_email,
+            "password_hash": hash_password(admin_password), "name": "Tartan Admin",
+            "role": "admin", "org_name": None, "created_at": now_iso(),
+        })
+        logger.info("Seeded admin account %s", admin_email)
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password), "role": "admin"}})
+
+
 @app.on_event("startup")
 async def on_startup():
     await db.members.create_index("share_token")
@@ -1033,12 +1416,17 @@ async def on_startup():
     await db.push_subs.create_index("member_id")
     await db.push_subs.create_index("endpoint")
     await db.tartans.create_index("token")
+    await db.tartans.create_index("owner_user_id")
+    await db.tartans.create_index("category")
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
     try:
         init_storage()
         logger.info("Storage initialized")
     except Exception as e:
         logger.error("storage init failed: %s", e)
     try:
+        await seed_admin()
         await seed_flagship()
         await backfill_sparks()
     except Exception as e:

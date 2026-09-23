@@ -12,6 +12,7 @@ import { useApp } from "@/context/AppContext";
 import { useTartanStream } from "@/hooks/useTartanStream";
 import { auraFor } from "@/lib/aura";
 import { fmtNum } from "@/lib/helpers";
+import { CATEGORY_MAP, CATEGORIES } from "@/lib/categories";
 import api from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -21,6 +22,7 @@ const item = { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0, tran
 const ChainCard = ({ tartan, featured }) => {
   const { t } = useApp();
   const aura = auraFor(tartan.token);
+  const cat = CATEGORY_MAP[tartan.category];
   return (
     <motion.div variants={item}>
       <Link
@@ -39,12 +41,20 @@ const ChainCard = ({ tartan, featured }) => {
           <ChainSigil seed={tartan.token} size={110} />
         </div>
         <div className="relative">
-          {featured && (
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-amber-400 mb-1.5">
-              <Flame size={11} /> {t("featured")}
-            </span>
-          )}
+          <div className="flex items-center gap-2 mb-1.5">
+            {featured && (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-amber-400">
+                <Flame size={11} /> {t("featured")}
+              </span>
+            )}
+            {cat && (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-slate-400">
+                {cat.emoji} {cat.label}
+              </span>
+            )}
+          </div>
           <h3 className="font-unbounded font-bold text-lg text-white leading-snug max-w-[80%]">{tartan.title}</h3>
+          {tartan.target && <p className="text-xs text-slate-400 mt-1 max-w-[85%]">🎯 {tartan.target}</p>}
           <p className="text-sm text-slate-400 mt-1 line-clamp-2 max-w-[85%]">{tartan.goal}</p>
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/10">
             <div className="flex items-center gap-2 text-sm">
@@ -65,14 +75,17 @@ export default function Home() {
   const { t } = useApp();
   const [tartans, setTartans] = useState(null);
   const [burstKey, setBurstKey] = useState(0);
+  const [selectedCat, setSelectedCat] = useState("all");
 
   useEffect(() => {
     api.get("/tartans").then(({ data }) => setTartans(data)).catch(() => setTartans([]));
   }, []);
 
   const featured = tartans?.find((x) => x.featured);
-  const rest = tartans?.filter((x) => !x.featured) || [];
+  const nonFeatured = tartans?.filter((x) => !x.featured) || [];
+  const rest = selectedCat === "all" ? nonFeatured : nonFeatured.filter((x) => x.category === selectedCat);
   const totalReach = (tartans || []).reduce((a, x) => a + (x.verified_members || 0), 0);
+  const catCount = (id) => nonFeatured.filter((x) => x.category === id).length;
 
   useTartanStream(featured?.token, { onJoin: () => setBurstKey((k) => k + 1) });
 
@@ -157,14 +170,38 @@ export default function Home() {
             />
           </div>
 
+          {/* Category filter */}
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-1 px-1" data-testid="category-filter">
+            <button
+              data-testid="category-chip-all"
+              onClick={() => setSelectedCat("all")}
+              className={`shrink-0 text-xs font-semibold rounded-full px-3.5 py-2 transition-colors ${selectedCat === "all" ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/40" : "text-slate-400 border border-slate-700 hover:border-slate-500"}`}
+            >
+              All ({nonFeatured.length})
+            </button>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                data-testid={`category-chip-${c.id}`}
+                onClick={() => setSelectedCat(c.id)}
+                className={`shrink-0 flex items-center gap-1 text-xs font-semibold rounded-full px-3.5 py-2 whitespace-nowrap transition-colors ${selectedCat === c.id ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/40" : "text-slate-400 border border-slate-700 hover:border-slate-500"}`}
+              >
+                {c.emoji} {c.label} <span className="text-slate-500">({catCount(c.id)})</span>
+              </button>
+            ))}
+          </div>
+
           {tartans === null ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-2xl bg-slate-800/40" />)}
             </div>
           ) : rest.length === 0 ? (
-            <p className="text-slate-500 text-center py-10">{t("no_chains")}</p>
+            <div className="text-center py-10" data-testid="no-chains-in-category">
+              <p className="text-slate-500">{selectedCat === "all" ? t("no_chains") : "No chains in this category yet."}</p>
+              <div className="mt-4 inline-block"><StartTartanDialog /></div>
+            </div>
           ) : (
-            <motion.div variants={container} initial="initial" whileInView="animate" viewport={{ once: true }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <motion.div key={selectedCat} variants={container} initial="initial" animate="animate" className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {rest.map((x) => <ChainCard key={x.token} tartan={x} />)}
             </motion.div>
           )}
