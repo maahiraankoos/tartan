@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 6 (Push Alerts + Team Battles + Invite Rewards) fully validated. Backend: 16/16 pytest passed — GET /api/push/vapid-public-key returns 88-char base64url VAPID key; POST /api/push/subscribe upserts subscription (200) for valid share_token, 400 when endpoint missing, 404 for unknown share_token. POST /api/tartans with teams=['Garowe Crew','Bosaso Crew'] creates chain with tartan_public.teams; join with valid team stores member.team, invalid team stores null; GET /api/tartans/{token}/teams returns {teams, scoreboard sorted by reach desc}. reward_for boundaries validated at 0/9/10/49/50/99/100 → 0/0/1/1/2/2/3 (Starter/Connector/Igniter). Amina (direct_count=32) → tier1 'Starter' as expected. Join fires direct notification on parent (still works, no 500). Frontend: Home StartTartan modal exposes tartan-teams-input + tartan-goaltarget-input. Created fresh team chain, /t/{token} shows team-battle panel with team-row-{i}; /j/{share} join modal shows team-picker with team-choice-Garowe Crew + team-choice-Bosaso Crew; picking Garowe + submit joins and /api/tartans/{token}/teams scoreboard reflects +1 Garowe Crew member. /me/j4atawQ7lw shows enable-push-button (label 'Alerts blocked in browser' — headless Notification API denies, expected), reward-strip with reward-tier-10 unlocked (Starter, full color) and reward-tier-50/100 greyed (opacity-40 grayscale) matching her direct_count=32. reward-badge visible on /me, /t/puntland leaderboard row, and /p/j4atawQ7lw profile. Regressions intact: leaderboard, city-race on /t/puntland still render; no team-battle panel on chains without teams.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration6.py",
+    "/app/test_reports/pytest/iteration6.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: push_to_member deletes sub only when webpush returns keep=False; broad `except WebPushException as e` catches all — good, join never blocks (fire-and-forget asyncio.create_task).",
+    "server.py join_tartan validates team membership against tartan.teams before storing; ensures no arbitrary team strings pollute scoreboard aggregate.",
+    "server.py:1063 approaching the 700-line 'split into modules' guideline (now 1063 lines). Consider splitting push/rewards/teams into routers when file exceeds 1200.",
+    "reward_for is pure and inline in server.py; tested directly. Boundary at 10/50/100 matches spec.",
+    "GET /api/tartans/{token}/teams uses Mongo aggregation with $match team != None + $group + $sort reach desc → efficient and correct."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100%"},
+  "test_credentials": "No auth. Amina share=j4atawQ7lw (direct_count=32, tier1 Starter). Flagship token=puntland.",
+  "seed_data_creation": "Fresh TEST_ chains created via API during tests (TEST_teams_*, TEST_reward_notif_*, TEST_ui2). Each has 1-3 TEST_ member joins. All prefixed for identification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests: /app/backend/tests/test_iteration6.py (uses REACT_APP_BACKEND_URL env, requires it set). API contracts: POST /api/tartans requires {title, goal, nickname, city?, goal_target?, teams?}; POST /api/tartans/{token}/join requires {nickname, city?, parent_share_token?, team?, idempotency_key?}. Member lookup by share_token = /api/profile/{share} or /api/share/{share} (not /api/members/{share}). Leaderboard returns list directly (not {rows:[]}). Web Push cannot be delivered in headless — validate enable-push-button/push-enabled testid presence only; permission will be 'denied' so button reads 'Alerts blocked in browser'.",
+  "rca of the issue": "None — no bugs found this iteration."
+}
