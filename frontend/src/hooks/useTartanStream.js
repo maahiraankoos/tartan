@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-export function useTartanStream(token, { onJoin } = {}) {
+export function useTartanStream(token, { onJoin, onMilestone } = {}) {
   const [stats, setStats] = useState(null);
   const onJoinRef = useRef(onJoin);
+  const onMsRef = useRef(onMilestone);
   useEffect(() => {
     onJoinRef.current = onJoin;
+    onMsRef.current = onMilestone;
   });
 
   useEffect(() => {
@@ -26,6 +28,12 @@ export function useTartanStream(token, { onJoin } = {}) {
       try {
         const d = JSON.parse(e.data);
         if (onJoinRef.current) onJoinRef.current(d);
+      } catch (err) {}
+    });
+    es.addEventListener("milestone", (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (onMsRef.current) onMsRef.current(d);
       } catch (err) {}
     });
     es.onerror = () => {};

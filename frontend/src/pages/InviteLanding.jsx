@@ -6,11 +6,13 @@ import { TrustBadges } from "@/components/TrustBadges";
 import { JoinModal } from "@/components/JoinModal";
 import { JoinReveal } from "@/components/JoinReveal";
 import { ChainSigil } from "@/components/ChainSigil";
+import { GoalMeter } from "@/components/CityRace";
+import { OGBadge } from "@/components/Badges";
 import { Avatar } from "@/components/Avatar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { useApp, saveMembership, getMembership } from "@/context/AppContext";
 import { useTartanStream } from "@/hooks/useTartanStream";
-import { mediaUrl } from "@/lib/helpers";
+import { mediaUrl, fmtNum } from "@/lib/helpers";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
@@ -91,10 +93,18 @@ export default function InviteLanding() {
           <div className="flex flex-col items-center gap-3">
             <Avatar name={inviter.nickname} src={mediaUrl(inviter.avatar_url)} size={68} ring testid="inviter-avatar" />
             <p className="text-slate-300" data-testid="invite-headline">
-              <span className="font-display font-bold text-cyan-300 text-glow-cyan text-lg">{inviter.nickname}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="font-display font-bold text-cyan-300 text-glow-cyan text-lg">{inviter.nickname}</span>
+                <OGBadge sparkNumber={inviter.spark_number} />
+              </span>
               <br />
-              {t("sent_you")}
+              {inviter.downstream_count > 0 ? (
+                <span>{t("has_reached")} <span className="font-bold text-white">{fmtNum(inviter.downstream_count)}</span> {t("people_reached")}</span>
+              ) : (
+                <span>{t("sent_you")}</span>
+              )}
             </p>
+            <p className="text-emerald-300 text-sm font-semibold">{t("be_next")} #{fmtNum((inviter.downstream_count || 0) + 1)}</p>
           </div>
 
           <div className="mt-5 rounded-2xl bg-white/5 border border-slate-700/60 p-4 flex items-center gap-3 text-left">
@@ -122,6 +132,12 @@ export default function InviteLanding() {
               <div className="text-[9px] uppercase tracking-wider text-slate-500">{t("active_cities")}</div>
             </div>
           </div>
+
+          {tartan.goal_target ? (
+            <div className="mt-4">
+              <GoalMeter target={tartan.goal_target} current={s.verified_members} />
+            </div>
+          ) : null}
 
           <button
             data-testid="join-chain-cta-button"

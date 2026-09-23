@@ -12,6 +12,7 @@ export const RipplePoster = ({ chain, shareToken }) => {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState("post");
   const qrRef = useRef(null);
 
   const me = chain?.me || {};
@@ -26,7 +27,7 @@ export const RipplePoster = ({ chain, shareToken }) => {
     try {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
     } catch (e) {}
-    const W = 1080, H = 1350;
+    const W = 1080, H = format === "story" ? 1920 : 1350;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
@@ -76,7 +77,7 @@ export const RipplePoster = ({ chain, shareToken }) => {
     ctx.fillText(rankTxt, 82, 255);
 
     // ripple
-    const cx = W / 2, cy = 720, R = 250;
+    const cx = W / 2, cy = format === "story" ? 900 : 720, R = 250;
     const layout = directs.map((d, i) => {
       const a = (i / Math.max(1, directs.length)) * Math.PI * 2 - Math.PI / 2;
       return { d, x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R, a };
@@ -134,7 +135,7 @@ export const RipplePoster = ({ chain, shareToken }) => {
     ctx.fillText("YOU", cx, cy + 26);
 
     // stats row
-    const statY = 1050;
+    const statY = H - 300;
     const stats = [
       { label: t("direct_joins"), val: fmtNum(me.direct_count || 0) },
       { label: t("downstream"), val: fmtNum(me.downstream_count || 0) },
@@ -157,15 +158,15 @@ export const RipplePoster = ({ chain, shareToken }) => {
     ctx.textAlign = "left";
     ctx.fillStyle = "#F0F6FF";
     ctx.font = "700 30px 'Outfit', sans-serif";
-    wrapText(ctx, tartan.title || "Tartan chain", 80, 1200, 600, 36);
+    wrapText(ctx, tartan.title || "Tartan chain", 80, H - 150, 600, 36);
     ctx.fillStyle = secondary;
     ctx.font = "600 20px 'JetBrains Mono', monospace";
-    ctx.fillText(t("keep_moving"), 80, 1265);
+    ctx.fillText(t("keep_moving"), 80, H - 100);
 
     // QR (draw white plate + qr canvas)
     const qrCanvas = qrRef.current?.querySelector("canvas");
     if (qrCanvas) {
-      const qx = W - 80 - 180, qy = 1160;
+      const qx = W - 80 - 180, qy = H - 220;
       ctx.fillStyle = "#ffffff";
       roundRect(ctx, qx - 14, qy - 14, 208, 208, 16); ctx.fill();
       ctx.drawImage(qrCanvas, qx, qy, 180, 180);
@@ -203,6 +204,14 @@ export const RipplePoster = ({ chain, shareToken }) => {
     } catch (e) { download(); }
   };
 
+  useEffect(() => {
+    if (open) {
+      setPreview(null);
+      const id = setTimeout(generate, 60);
+      return () => clearTimeout(id);
+    }
+  }, [format]);
+
   return (
     <>
       <button
@@ -223,8 +232,20 @@ export const RipplePoster = ({ chain, shareToken }) => {
           <DialogTitle className="sr-only">Share poster</DialogTitle>
           <DialogDescription className="sr-only">A shareable image of your chain with a QR code to join.</DialogDescription>
           <div className="flex flex-col items-center gap-4 py-1">
+            <div className="flex gap-1 p-1 rounded-full bg-slate-800/60 border border-slate-700" data-testid="poster-format-toggle">
+              {["post", "story"].map((f) => (
+                <button
+                  key={f}
+                  data-testid={`poster-format-${f}`}
+                  onClick={() => setFormat(f)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${format === f ? "bg-cyan-500 text-slate-950" : "text-slate-300"}`}
+                >
+                  {f === "post" ? t("format_post") + " 4:5" : t("format_story") + " 9:16"}
+                </button>
+              ))}
+            </div>
             {preview ? (
-              <img src={preview} alt="Your chain poster" className="w-full max-w-[320px] rounded-2xl border border-cyan-500/30 neon-cyan" data-testid="poster-image" />
+              <img src={preview} alt="Your chain poster" className={`w-full rounded-2xl border border-cyan-500/30 neon-cyan ${format === "story" ? "max-w-[240px]" : "max-w-[320px]"}`} data-testid="poster-image" />
             ) : (
               <div className="w-full max-w-[320px] aspect-[4/5] rounded-2xl border border-slate-700 flex items-center justify-center">
                 <Loader2 className="animate-spin text-cyan-400" size={26} />

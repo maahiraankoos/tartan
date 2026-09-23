@@ -8,6 +8,8 @@ import { ReportDialog } from "@/components/ReportDialog";
 import { MilestoneCard } from "@/components/MilestoneCard";
 import { PersonalRipple } from "@/components/PersonalRipple";
 import { RipplePoster } from "@/components/RipplePoster";
+import { NotificationsFeed } from "@/components/NotificationsFeed";
+import { StreakBadge, OGBadge } from "@/components/Badges";
 import { ChainSigil } from "@/components/ChainSigil";
 import { Avatar } from "@/components/Avatar";
 import { Progress } from "@/components/ui/progress";
@@ -25,12 +27,14 @@ export default function MeDashboard() {
   const [error, setError] = useState(false);
   const [msOpen, setMsOpen] = useState(false);
   const [celebrateMs, setCelebrateMs] = useState(null);
+  const [recap, setRecap] = useState(null);
   const fileRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get(`/members/${shareToken}/chain`);
       setChain(data);
+      api.get(`/members/${shareToken}/recap`).then(({ data }) => setRecap(data)).catch(() => {});
     } catch (e) {
       setError(true);
     }
@@ -158,27 +162,47 @@ export default function MeDashboard() {
         {/* Spark & spreader status */}
         {tartan && (
           <div
-            className="rounded-2xl border p-4 mb-5 flex items-center gap-4 relative overflow-hidden"
+            className="rounded-2xl border p-4 mb-5 relative overflow-hidden"
             data-testid="spark-status"
             style={{
               borderColor: auraFor(tartan.token).palette.primary + "40",
               background: `linear-gradient(135deg, ${auraFor(tartan.token).palette.primary}12, #0B101D 60%, ${auraFor(tartan.token).palette.secondary}10)`,
             }}
           >
-            <div className="shrink-0"><ChainSigil seed={tartan.token} size={60} /></div>
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-widest text-slate-400">Your spark</div>
-              <div className="font-unbounded text-3xl font-black text-white leading-none">#{me.spark_number ?? "—"}</div>
+            <div className="flex items-center gap-4">
+              <div className="shrink-0"><ChainSigil seed={tartan.token} size={60} /></div>
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-slate-400">Your spark</div>
+                <div className="flex items-center gap-2">
+                  <div className="font-unbounded text-3xl font-black text-white leading-none">#{me.spark_number ?? "—"}</div>
+                  <OGBadge sparkNumber={me.spark_number} />
+                </div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="font-mono text-2xl font-extrabold" style={{ color: auraFor(tartan.token).palette.primary }} data-testid="spreader-rank">#{rank}</div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-400">{t("your_rank")}</div>
+                <div className="text-[10px] text-emerald-400 mt-0.5">Top {percentile}% of {fmtNum(total_in_chain)}</div>
+              </div>
             </div>
-            <div className="ml-auto text-right">
-              <div className="font-mono text-2xl font-extrabold" style={{ color: auraFor(tartan.token).palette.primary }} data-testid="spreader-rank">#{rank}</div>
-              <div className="text-[10px] uppercase tracking-widest text-slate-400">{t("your_rank")}</div>
-              <div className="text-[10px] text-emerald-400 mt-0.5">Top {percentile}% of {fmtNum(total_in_chain)}</div>
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10 flex-wrap">
+              <StreakBadge streak={chain.streak} />
+              {recap && recap.invited_this_week > 0 && (
+                <span className="text-xs text-emerald-300 font-semibold border border-emerald-500/30 bg-emerald-500/10 rounded-full px-2.5 py-1" data-testid="weekly-recap-chip">
+                  +{fmtNum(recap.invited_this_week)} {t("invited_this_week")}
+                </span>
+              )}
+              <Link to={`/p/${shareToken}`} data-testid="my-profile-link" className="ml-auto text-xs font-semibold text-cyan-300 hover:text-cyan-200">
+                {t("my_profile")} →
+              </Link>
             </div>
           </div>
         )}
 
-        <SharePanel shareToken={shareToken} tartanTitle={tartan?.title} />
+        <NotificationsFeed shareToken={shareToken} refreshKey={dc} />
+
+        <div className="mt-5">
+          <SharePanel shareToken={shareToken} tartanTitle={tartan?.title} />
+        </div>
 
         {/* Milestone progress */}
         <div className="mt-5 rounded-2xl border border-slate-700/60 bg-[#0E1526] p-5" data-testid="milestone-card">

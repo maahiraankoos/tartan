@@ -4,11 +4,15 @@ import { ArrowLeft, Users, Crown, GitBranch } from "lucide-react";
 import { Header } from "@/components/Header";
 import { GlobalStats } from "@/components/GlobalStats";
 import { ChainMap } from "@/components/ChainMap";
+import { Leaderboard } from "@/components/Leaderboard";
+import { CityRace, GoalMeter } from "@/components/CityRace";
+import { MilestoneTakeover } from "@/components/MilestoneTakeover";
 import { JoinModal } from "@/components/JoinModal";
 import { JoinReveal } from "@/components/JoinReveal";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Avatar } from "@/components/Avatar";
 import { ChainSigil } from "@/components/ChainSigil";
+import { VerifiedBadge } from "@/components/Badges";
 import { useApp, saveMembership, getMembership } from "@/context/AppContext";
 import { useTartanStream } from "@/hooks/useTartanStream";
 import api from "@/lib/api";
@@ -22,10 +26,12 @@ export default function TartanView() {
   const [joinOpen, setJoinOpen] = useState(false);
   const [joining, setJoining] = useState(false);
   const [reveal, setReveal] = useState(null);
+  const [milestone, setMilestone] = useState(null);
   const myShare = getMembership(token);
 
   const { stats: liveStats } = useTartanStream(token, {
     onJoin: (j) => toast(`${j.nickname} · ${j.city}`, { icon: "⚡", description: "just joined the chain" }),
+    onMilestone: (d) => setMilestone(d),
   });
 
   const load = useCallback(async () => {
@@ -88,7 +94,7 @@ export default function TartanView() {
                 <h1 className="font-display text-2xl sm:text-3xl font-black text-white leading-tight">{tartan.title}</h1>
                 <p className="text-slate-300 mt-1.5">{tartan.goal}</p>
                 <div className="flex items-center gap-3 mt-3 text-xs text-slate-400">
-                  <span className="flex items-center gap-1"><Crown size={12} className="text-amber-400" /> {tartan.initiator_nickname}</span>
+                  <span className="flex items-center gap-1"><Crown size={12} className="text-amber-400" /> {tartan.initiator_nickname} {tartan.verified_organizer && <VerifiedBadge verified />}</span>
                   {tartan.city && <span>· {tartan.city}</span>}
                   <span className="flex items-center gap-1"><Users size={12} className="text-cyan-400" /> {stats?.verified_members ?? tartan.verified_members} {t("verified")}</span>
                 </div>
@@ -118,12 +124,18 @@ export default function TartanView() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4">
+          <div className="lg:col-span-4 space-y-4">
             <GlobalStats stats={stats} />
+            {tartan?.goal_target ? <GoalMeter target={tartan.goal_target} current={stats?.verified_members ?? tartan.verified_members} /> : null}
           </div>
           <div className="lg:col-span-8">
             <ChainMap token={token} />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <Leaderboard token={token} refreshKey={stats?.total_members || 0} />
+          <CityRace token={token} refreshKey={stats?.total_members || 0} />
         </div>
 
         <div className="mt-6 flex justify-end">
@@ -137,6 +149,7 @@ export default function TartanView() {
         {...(reveal || {})}
         onContinue={() => { const st = reveal.shareToken; setReveal(null); navigate(`/me/${st}`); }}
       />
+      <MilestoneTakeover data={milestone} seed={token} onClose={() => setMilestone(null)} />
     </>
   );
 }

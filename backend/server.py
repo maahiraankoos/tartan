@@ -163,6 +163,7 @@ class TartanCreate(BaseModel):
     city: Optional[str] = None
     nickname: str
     real_name: Optional[str] = None
+    goal_target: Optional[int] = None
 
 
 class JoinCreate(BaseModel):
@@ -216,8 +217,18 @@ def tartan_public(t: dict) -> dict:
         "total_members": t.get("total_members", 0),
         "verified_members": t.get("verified_members", 0),
         "max_depth": t.get("max_depth", 0),
+        "goal_target": t.get("goal_target"),
+        "verified_organizer": t.get("verified_members", 0) >= 25,
         "created_at": t.get("created_at"),
     }
+
+
+async def member_rank(tartan_id: str, downstream: int):
+    ahead = await db.members.count_documents({"tartan_id": tartan_id, "downstream_count": {"$gt": downstream}})
+    total = await db.members.count_documents({"tartan_id": tartan_id})
+    rank = ahead + 1
+    pct = max(1, round((1 - (rank - 1) / max(1, total)) * 100))
+    return rank, total, pct
 
 
 async def compute_stats(t: dict) -> dict:
@@ -280,6 +291,7 @@ async def create_tartan(payload: TartanCreate, request: Request, response: Respo
         "total_members": 1,
         "verified_members": 1,
         "max_depth": 0,
+        "goal_target": (payload.goal_target if payload.goal_target and payload.goal_target > 0 else None),
         "created_at": ts,
     }
     await db.tartans.insert_one(dict(tartan))
@@ -357,8 +369,12 @@ async def get_share_context(share_token: str):
     if not t:
         raise HTTPException(status_code=404, detail="Tartan not found")
     stats = await compute_stats(t)
+    inv_rank, _, inv_pct = await member_rank(t["token"], m.get("downstream_count", 0))
+    inviter = member_public(m)
+    inviter["rank"] = inv_rank
+    inviter["percentile"] = inv_pct
     return {
-        "inviter": member_public(m),
+        "inviter": inviter,
         "tartan": tartan_public(t),
         "stats": stats,
     }
@@ -437,8 +453,10 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
 
     # denormalized updates: direct parent +1 direct; all ancestors +1 downstream
     await db.members.update_one({"id": parent["id"]}, {"$inc": {"direct_count": 1}})
-    ancestor_id = parent["id"]
     inc_verified = 1 if verified else 0
+    ancestor_id = parent["id"]
+    idx = 0
+    notif_docs = []
     while ancestor_id:
         anc = await db.members.find_one({"id": ancestor_id}, {"parent_id": 1, "id": 1})
         if not anc:
@@ -447,13 +465,30 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
             {"id": ancestor_id},
             {"$inc": {"downstream_count": 1, "verified_downstream": inc_verified}},
         )
+        if idx < 3:
+            notif_docs.append({
+                "id": secrets.token_hex(12),
+                "member_id": ancestor_id,
+                "tartan_id": token,
+                "type": "direct" if idx == 0 else "branch",
+                "joiner_nickname": member["nickname"],
+                "joiner_city": member["city"],
+                "created_at": ts,
+                "read": False,
+            })
+        idx += 1
         ancestor_id = anc.get("parent_id")
+    if notif_docs:
+        await db.notifications.insert_many(notif_docs)
 
+    prev_total = t.get("total_members", 0)
     await db.tartans.update_one(
         {"token": token},
         {"$inc": {"total_members": 1, "verified_members": inc_verified},
          "$max": {"max_depth": depth}},
     )
+    new_total = prev_total + 1
+    crossed = [m for m in MILESTONES if prev_total < m <= new_total]
 
     # real-time fan-out
     t2 = await db.tartans.find_one({"token": token}, {"_id": 0})
@@ -462,6 +497,8 @@ async def join_tartan(token: str, payload: JoinCreate, request: Request, respons
     await publish(token, {"type": "join", "data": {
         "nickname": member["nickname"], "city": member["city"], "verified": verified,
     }})
+    if crossed:
+        await publish(token, {"type": "milestone", "data": {"value": crossed[0], "title": t.get("title")}})
 
     return {"member": member_public(member)}
 
@@ -494,6 +531,14 @@ async def get_chain(share_token: str):
     rank = ahead + 1
     percentile = max(1, round((1 - (rank - 1) / max(1, total_in_chain)) * 100))
 
+    # share streak: consecutive days (ending today) the member invited someone
+    direct_dates = set((d.get("created_at") or "")[:10] for d in directs)
+    streak = 0
+    cur = datetime.now(timezone.utc).date()
+    while cur.isoformat() in direct_dates:
+        streak += 1
+        cur = cur - timedelta(days=1)
+
     return {
         "me": member_public(me),
         "inviter": inviter,
@@ -504,6 +549,7 @@ async def get_chain(share_token: str):
         "rank": rank,
         "total_in_chain": total_in_chain,
         "percentile": percentile,
+        "streak": streak,
     }
 
 
@@ -659,6 +705,76 @@ async def analytics(token: str, owner: str = Query(...)):
     }
 
 
+@api_router.get("/tartans/{token}/leaderboard")
+async def leaderboard(token: str):
+    t = await db.tartans.find_one({"token": token})
+    if not t:
+        raise HTTPException(status_code=404, detail="Tartan not found")
+    docs = await db.members.find({"tartan_id": token}, {"_id": 0}).sort(
+        [("downstream_count", -1), ("direct_count", -1), ("created_at", 1)]
+    ).limit(20).to_list(20)
+    out = []
+    for i, m in enumerate(docs):
+        pm = member_public(m)
+        pm["rank"] = i + 1
+        out.append(pm)
+    return out
+
+
+@api_router.get("/members/{share_token}/notifications")
+async def get_notifications(share_token: str):
+    me = await db.members.find_one({"share_token": share_token}, {"id": 1})
+    if not me:
+        raise HTTPException(status_code=404, detail="Member not found")
+    docs = await db.notifications.find({"member_id": me["id"]}, {"_id": 0}).sort("created_at", -1).limit(30).to_list(30)
+    unread = await db.notifications.count_documents({"member_id": me["id"], "read": False})
+    return {"notifications": docs, "unread": unread}
+
+
+@api_router.post("/members/{share_token}/notifications/read")
+async def read_notifications(share_token: str):
+    me = await db.members.find_one({"share_token": share_token}, {"id": 1})
+    if not me:
+        raise HTTPException(status_code=404, detail="Member not found")
+    await db.notifications.update_many({"member_id": me["id"], "read": False}, {"$set": {"read": True}})
+    return {"ok": True}
+
+
+@api_router.get("/members/{share_token}/recap")
+async def recap(share_token: str):
+    me = await db.members.find_one({"share_token": share_token}, {"_id": 0})
+    if not me:
+        raise HTTPException(status_code=404, detail="Member not found")
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    invited_week = await db.members.count_documents({"parent_id": me["id"], "created_at": {"$gte": week_ago}})
+    rank, total, pct = await member_rank(me["tartan_id"], me.get("downstream_count", 0))
+    return {
+        "invited_this_week": invited_week,
+        "total_reached": me.get("downstream_count", 0),
+        "direct_count": me.get("direct_count", 0),
+        "rank": rank,
+        "percentile": pct,
+        "spark_number": me.get("spark_number"),
+    }
+
+
+@api_router.get("/profile/{share_token}")
+async def profile(share_token: str):
+    me = await db.members.find_one({"share_token": share_token}, {"_id": 0})
+    if not me:
+        raise HTTPException(status_code=404, detail="Member not found")
+    t = await db.tartans.find_one({"token": me["tartan_id"]}, {"_id": 0})
+    rank, total, pct = await member_rank(me["tartan_id"], me.get("downstream_count", 0))
+    pm = member_public(me)
+    pm["rank"] = rank
+    pm["percentile"] = pct
+    return {
+        "member": pm,
+        "tartan": tartan_public(t) if t else None,
+        "verified_organizer": (t.get("verified_members", 0) >= 25) if t else False,
+    }
+
+
 @api_router.post("/reports")
 async def create_report(payload: ReportCreate, request: Request, response: Response):
     device = get_or_issue_device(request, response)
@@ -780,6 +896,8 @@ async def on_startup():
     await db.members.create_index("share_token")
     await db.members.create_index([("tartan_id", 1), ("device", 1)])
     await db.members.create_index("parent_share_token")
+    await db.members.create_index("parent_id")
+    await db.notifications.create_index("member_id")
     await db.tartans.create_index("token")
     try:
         init_storage()
